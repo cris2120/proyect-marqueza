@@ -1,0 +1,22 @@
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  api:
+    build:
+      context: ..
+      dockerfile: base de datos orm sqlalchemy/Dockerfile.backend
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: ${MYSQL_HOST:?Define MYSQL_HOST en Dokploy}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER:?Define MYSQL_USER en Dokploy}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Define MYSQL_PASSWORD en Dokploy}
+      MYSQL_DB: ${MYSQL_DB:?Define MYSQL_DB en Dokploy}
+    expose:
+      - "5000"

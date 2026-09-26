@@ -1,0 +1,5 @@
+Flask
+Flask-MySQLdb
+python-dotenv
+Gunicorn
+SQLAlchemy>=2.0,<3.0
