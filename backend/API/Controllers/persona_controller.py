@@ -19,7 +19,7 @@ class persona_controller:
         telefono = data["telefono"]
 
         x = persona_services.addPersona(nombre, seg_nombre, pri_apellido, seg_apellido, correo, direccion, identificacion, telefono)
-        return jsonify(x), 200
+        return jsonify({"id": x}), 201
 
     def cntDelPersona(id):
         data = persona_services.deletePersona(id)

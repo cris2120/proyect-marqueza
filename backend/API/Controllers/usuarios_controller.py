@@ -17,9 +17,9 @@ def cntDelUsuarios(id):
     return jsonify(deleteUsuarios(id)), 200
 
 def cntModUsuarios(id):
-    payload, error = required_json("nombre", "correo", "contrasena", "estado", "det_etc_id")
+    payload, error = required_json("nombre", "correo", "estado", "det_etc_id")
     if error:
         return error
-    result = updateUsuarios(id, payload["nombre"], payload["correo"], payload["contrasena"], payload["estado"], payload["det_etc_id"])
+    result = updateUsuarios(id, payload["nombre"], payload["correo"], payload.get("contrasena"), payload["estado"], payload["det_etc_id"])
     return jsonify(result), 200
 

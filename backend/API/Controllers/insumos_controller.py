@@ -16,9 +16,10 @@ class insumos_controller:
         usuario_id = data["usuario_id"]
         proveedor_id = data["proveedor_id"]
         etc_id = data["etc_id"]
+        unidad = data["unidad"]
 
-        x = insumos_services.addInsumos(codigo, nombre, cantidad, precio, estado, usuario_id, proveedor_id, etc_id)
-        return jsonify(x), 200
+        x = insumos_services.addInsumos(codigo, nombre, cantidad, precio, estado, usuario_id, proveedor_id, etc_id, unidad)
+        return jsonify({"id": x}), 201
 
     def cntDelInsumos(id):
         data = insumos_services.deleteInsumos(id)
@@ -35,7 +36,8 @@ class insumos_controller:
         usuario_id = data["usuario_id"]
         proveedor_id = data["proveedor_id"]
         etc_id = data["etc_id"]
+        unidad = data["unidad"]
 
-        x = insumos_services.updateInsumos(id, codigo, nombre, cantidad, precio, estado, usuario_id, proveedor_id, etc_id)
+        x = insumos_services.updateInsumos(id, codigo, nombre, cantidad, precio, estado, usuario_id, proveedor_id, etc_id, unidad)
         return jsonify(x), 201
 

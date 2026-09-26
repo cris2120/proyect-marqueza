@@ -12,7 +12,7 @@ class contacto_controller:
         proveedor_id = request.json["proveedor_id"]
 
         data = contacto_services.addContacto(tipo_contacto, contenido, proveedor_id)
-        return jsonify(data), 200
+        return jsonify({"id": data}), 201
 
     def cntDelContacto(id):
         data = contacto_services.deleteContacto(id)

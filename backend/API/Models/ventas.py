@@ -11,7 +11,7 @@ class Ventas:
         return {
             "id": self.VENT_ID,
             "uuid": self.VENT_UUID,
-            "fecha": self.VENT_FECHA,
+            "fecha": self.VENT_FECHA.isoformat() if hasattr(self.VENT_FECHA, "isoformat") else self.VENT_FECHA,
             "usua_id": self.VENT_USUA_ID,
             "cli_id": self.VENT_CLI_ID
         }

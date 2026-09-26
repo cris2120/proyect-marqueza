@@ -7,19 +7,19 @@ def cntListVentProd():
     return jsonify(data), 200
 
 def cntAddVentProd():
-    payload, error = required_json("cantidad", "vent_id", "prod_id")
+    payload, error = required_json("cantidad", "vent_id", "prod_id", "precio")
     if error:
         return error
-    result = addVentProd(payload["cantidad"], payload["vent_id"], payload["prod_id"])
-    return jsonify(result), 201
+    record_id = addVentProd(payload["cantidad"], payload["vent_id"], payload["prod_id"], payload["precio"])
+    return jsonify({"id": record_id}), 201
 
 def cntDelVentProd(id):
     return jsonify(deleteVentProd(id)), 200
 
 def cntModVentProd(id):
-    payload, error = required_json("cantidad", "vent_id", "prod_id")
+    payload, error = required_json("cantidad", "vent_id", "prod_id", "precio")
     if error:
         return error
-    result = updateVentProd(id, payload["cantidad"], payload["vent_id"], payload["prod_id"])
+    result = updateVentProd(id, payload["cantidad"], payload["vent_id"], payload["prod_id"], payload["precio"])
     return jsonify(result), 200
 

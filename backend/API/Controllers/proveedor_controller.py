@@ -10,7 +10,7 @@ def cntAddProveedor():
     payload, error = required_json("persona_id")
     if error:
         return error
-    return jsonify(addProveedor(payload["persona_id"])), 201
+    return jsonify({"id": addProveedor(payload["persona_id"])}), 201
 
 def cntDelProveedor(id):
     return jsonify(deleteProveedor(id)), 200

@@ -15,7 +15,8 @@ def cntAddVentas():
         fecha = date.fromisoformat(payload["fecha"])
     except (TypeError, ValueError):
         return jsonify({"error": "fecha debe usar el formato AAAA-MM-DD."}), 400
-    return jsonify(addVentas(fecha, payload["usua_id"], payload["cli_id"])), 201
+    record_id = addVentas(fecha, payload["usua_id"], payload["cli_id"])
+    return jsonify({"id": record_id}), 201
 
 def cntDelVentas(id):
     return jsonify(deleteVentas(id)), 200
