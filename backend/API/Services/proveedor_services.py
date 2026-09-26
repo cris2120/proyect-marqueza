@@ -6,7 +6,7 @@ def servListProveedor():
     return orm_list("t_proveedores", Proveedor)
 
 def addProveedor(persona_id):
-    orm_insert("t_proveedores", {
+    return orm_insert("t_proveedores", {
         "PROV_UUID": str(uuid_lib.uuid4()),
         "PROV_PER_ID": persona_id,
     })

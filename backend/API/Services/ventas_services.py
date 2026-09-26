@@ -10,13 +10,12 @@ def servListVentas():
 def addVentas(fecha, usuario_id, cliente_id):
     if isinstance(fecha, str):
         fecha = date.fromisoformat(fecha)
-    orm_insert("t_ventas", {
+    return orm_insert("t_ventas", {
         "VENT_UUID": str(uuid_lib.uuid4()),
         "VENT_FECHA": fecha,
         "VENT_USUA_ID": usuario_id,
         "VENT_CLI_ID": cliente_id,
     })
-    return "Venta agregado correctamente"
 
 def deleteVentas(id):
     orm_delete("t_ventas", id)

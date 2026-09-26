@@ -7,7 +7,7 @@ class persona_services:
         return orm_list("t_persona", Persona)
 
     def addPersona(nombre, seg_nombre, pri_apellido, seg_apellido, correo, direccion, identificacion, telefono):
-        orm_insert("t_persona", {
+        return orm_insert("t_persona", {
             "PER_UUID": str(uuid_lib.uuid4()),
             "PER_NOMBRE": nombre,
             "PER_SEG_NOMBRE": seg_nombre,

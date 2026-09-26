@@ -13,6 +13,7 @@ from .vent_prod_bp import vent_prod_bp
 from .ventas_bp import ventas_bp
 from .documentacion_bp import documentacion_bp
 from .auth_bp import auth_bp
+from .auditoria_bp import auditoria_bp
 
 
 def load_routes(app):
@@ -31,3 +32,4 @@ def load_routes(app):
     app.register_blueprint(ventas_bp, url_prefix='/ventas')
     app.register_blueprint(documentacion_bp, url_prefix='/documentacion')
     app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(auditoria_bp, url_prefix='/auditoria')

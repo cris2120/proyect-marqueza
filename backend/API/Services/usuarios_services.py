@@ -21,11 +21,13 @@ def deleteUsuarios(id):
     return "Usuario eliminado correctamente"
 
 def updateUsuarios(id, nombre, correo, contrasena, estado, det_etc_id):
-    orm_update("t_usuarios", id, {
+    values = {
         "USUA_NOMBRE": nombre,
         "USUA_CORREO": correo,
-        "USUA_CONTRASEÑA": contrasena,
         "USUA_ESTADO": estado,
         "USUA_DET_ETC_ID": det_etc_id,
-    })
+    }
+    if contrasena:
+        values["USUA_CONTRASEÑA"] = contrasena
+    orm_update("t_usuarios", id, values)
     return "Usuario actualizado correctamente"

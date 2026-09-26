@@ -4,10 +4,45 @@ import smtplib
 from email.message import EmailMessage
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request
+from sqlalchemy import func, select
+
+from orm import orm_model, orm_session
 
 
 auth_bp = Blueprint("auth_bp", __name__)
 _reset_tokens = {}
+
+
+@auth_bp.route("/login", methods=["POST"])
+def login():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "El cuerpo debe ser un objeto JSON."}), 400
+
+    username = str(payload.get("usuario", "")).strip()
+    password = str(payload.get("contrasena", ""))
+    if not username or not password:
+        return jsonify({"error": "Ingresa usuario y contraseña."}), 400
+
+    model = orm_model("t_usuarios")
+    with orm_session() as session:
+        user = session.scalar(
+            select(model).where(func.lower(model.USUA_NOMBRE) == username.lower())
+        )
+        stored_password = str(getattr(user, "USUA_CONTRASEÑA", "")) if user else ""
+        if not user or not secrets.compare_digest(stored_password, password):
+            return jsonify({"error": "El usuario o la contraseña son incorrectos."}), 401
+
+        return jsonify({
+            "usuario": {
+                "id": user.USUA_ID,
+                "uuid": user.USUA_UUID,
+                "nombre": user.USUA_NOMBRE,
+                "correo": user.USUA_CORREO,
+                "estado": user.USUA_ESTADO,
+                "det_etc_id": user.USUA_DET_ETC_ID,
+            }
+        }), 200
 
 
 def send_reset_email(recipient, reset_url):

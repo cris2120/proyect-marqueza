@@ -7,10 +7,7 @@ class cliente_services:
         return orm_list("t_cliente", Cliente)
 
     def addCliente(persona_id):
-        orm_insert("t_cliente", {"CLI_UUID": str(uuid_lib.uuid4()), "CLI_PER_ID": persona_id})
-        return {
-            "mensaje": "Cliente agregado correctamente",
-        }
+        return orm_insert("t_cliente", {"CLI_UUID": str(uuid_lib.uuid4()), "CLI_PER_ID": persona_id})
 
     def deleteCliente(id):
         orm_delete("t_cliente", id)
