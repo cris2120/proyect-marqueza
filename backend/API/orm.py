@@ -52,7 +52,10 @@ def orm_list(table_name, output_type):
 def orm_insert(table_name, values):
     model = orm_model(table_name)
     with orm_session() as session:
-        session.add(model(**values))
+        row = model(**values)
+        session.add(row)
+    primary_key = model.__mapper__.primary_key[0].key
+    return getattr(row, primary_key)
 
 
 def orm_update(table_name, record_id, values):

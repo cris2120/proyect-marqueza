@@ -1,5 +1,5 @@
 from flask import Flask
-from config import Config
+from config import Config, validate_mysql_config
 from Routes import load_routes
 from flask_mysqldb import MySQL
 from orm import configure_orm
@@ -7,6 +7,7 @@ from orm import configure_orm
 app = Flask(__name__)
 
 app.config.from_object(Config)
+validate_mysql_config(app.config)
 
 mysql = MySQL(app)
 app.mysql = mysql
