@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productos — MARQUEZA</title>
+    <!-- Estilos específicos para la sección de insumos y componentes responsivos -->
+    <link rel="stylesheet" href="estilos_productos.css">
+    <link rel="stylesheet" href="../shared/estilos-base.css">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+</head>
+
+<body class="module-productos">
+<script src="../shared/persistencia-tema.js"></script>
+    <!-- Barra lateral de navegación, inicialmente colapsada (clase 'close') -->
+    <nav class="barra_lateral close">
+        <header>
+            <!-- Contenedor para el logo y el texto del título -->
+            <div class="imagen_texto">
+                <span class="imagen">
+                    <img src="../fondo/icono 3.png" alt="Logo Marqueza">
+                </span>
+                <div class="texto texto_titulo">
+                    <span class="titulo">MARQUEZA</span>
+                    <span class="subtitulo">confecciones que inspiran</span>
+                </div>
+            </div>
+
+            <!-- Flecha (desktop) -->
+            <i class='bx bx-chevron-right toggle'></i>
+
+            <!-- Hamburger (tablet / móvil) — oculto en desktop vía CSS -->
+            <div class="hamburger" id="hamburger" aria-label="Abrir menú" role="button" tabindex="0">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </header>
+
+        <!-- ── Menú principal ── -->
+        <!-- Contenedor del menú de navegación -->
+        <div class="barra_menu">
+            <div class="menu">
+                <!-- Lista de enlaces de navegación -->
+                <ul class="links_menu">
+                    <li class="nav_links">
+                        <a href="../inicio/inicio.html">
+                            <i class='bx bx-home-alt icon'></i>
+                            <span class="texto nav_texto">Inicio</span>
+                        </a>
+                    </li>
+                    <li class="nav_links">
+                        <a href="../insumos/insumos.html">
+                            <i class='bx bx-task icon'></i>
+                            <span class="texto nav_texto">Insumos</span>
+                        </a>
+                    </li>
+                    <li class="nav_links">
+                        <a href="../productos/productos.html">
+                            <i class='bx bxs-t-shirt icon'></i>
+                            <span class="texto nav_texto">Productos</span>
+                        </a>
+                    </li>
+                    <li class="nav_links">
+                        <a href="../ventas/ventas.html">
+                            <i class='bx bx-money-withdraw icon'></i>
+                            <span class="texto nav_texto">Pedidos</span>
+                        </a>
+                    </li>
+                    <li class="nav_links">
+                        <a href="#">
+                            <i class='bx bx-book-content icon'></i>
+                            <span class="texto nav_texto">Cotizaciones</span>
+                        </a>
+                    </li>
+                    <li class="nav_links">
+                        <a href="../clientes/clientes.html">
+                            <i class='bx bx-group icon'></i>
+                            <span class="texto nav_texto">Clientes</span>
+                        </a>
+                    </li>
+                    <li class="nav_links">
+                        <a href="../proveedores/proveedores.html">
+                            <i class='bx bx-package icon'></i>
+                            <span class="texto nav_texto">Proveedores</span>
+                        </a>
+                    </li>
+                    <li class="nav_links">
+                        <a href="../usuarios/usuarios.html">
+                            <i class='bx bx-user-circle icon'></i>
+                            <span class="texto nav_texto">Usuarios</span>
+                        </a>
+                    </li>
+                    <li class="nav_links">
+                        <a href="../log_errores/registro_actividad.html">
+                            <i class='bx bx-help-circle icon'></i>
+                            <span class="texto nav_texto">Ayuda</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Sección inferior del menú: botón de salir y selector de modo oscuro/claro -->
+            <div class="boton-contenido">
+                <!-- Enlace para salir de la sesión -->
+                <li>
+                    <a href="#">
+                        <i class='bx bx-log-out icon'></i>
+                        <span class="texto nav_texto">Salir</span>
+                    </a>
+                </li>
+
+                <!-- Selector de modo oscuro/claro -->
+                <li class="modo">
+                    <!-- Iconos de sol y luna para representar los modos -->
+                    <div class="sol_luna">
+                        <i class='bx bx-sun icon sol'></i>
+                        <i class='bx bx-moon icon luna'></i>
+                    </div>
+                    <span class="texto modo_texto">Oscuro</span>
+
+                    <!-- Interruptor visual para cambiar el modo -->
+                    <div class="toggle_switch">
+                        <span class="switch"></span>
+                    </div>
+                </li>
+            </div>
+        </div>
+    </nav>
+    <main class="cont_2">
+        <section class="page-heading">
+            <div>
+                <span class="eyebrow">Catálogo y producción</span>
+                <h1>Productos</h1>
+                <p>Administra tu catálogo, conoce el valor disponible y mantén cada referencia lista para vender.</p>
+            </div>
+            <button type="button" class="agregar heading-action"><i class='bx bx-plus'></i><span>Nuevo producto</span></button>
+        </section>
+
+        <section class="product-summary" aria-label="Resumen de productos">
+            <article class="summary-card"><div class="summary-icon"><i class='bx bxs-t-shirt'></i></div><div><span>Productos registrados</span><strong id="totalProductos">0</strong><small>Referencias en catálogo</small></div></article>
+            <article class="summary-card"><div class="summary-icon stock-warning"><i class='bx bx-error-alt'></i></div><div><span>Stock bajo</span><strong id="productosBajos">0</strong><small>Requieren producción</small></div></article>
+            <article class="summary-card"><div class="summary-icon stock-good"><i class='bx bx-check-shield'></i></div><div><span>Unidades disponibles</span><strong id="unidadesProductos">0</strong><small>Existencias actuales</small></div></article>
+            <article class="summary-card"><div class="summary-icon product-value"><i class='bx bx-wallet'></i></div><div><span>Valor del catálogo</span><strong id="valorProductos">$0</strong><small>Cantidad por precio</small></div></article>
+        </section>
+
+        <section class="workspace-panel">
+            <div class="workspace-header"><div><span class="eyebrow">Catálogo registrado</span><h2>Referencias de producto</h2></div><span class="record-count" id="resultadosProductos">0 resultados</span></div>
+            <div class="cont_busqueda">
+                <div class="search-field"><input type="text" id="searchInput" placeholder="Buscar por código, nombre o categoría..." aria-label="Buscar producto"></div>
+                <button type="button" id="btnBuscar" class="btn-secondary"><i class='bx bx-search'></i><span>Buscar</span></button>
+                <button type="button" id="btnExportPdf" class="btn-secondary btn-pdf"><i class='bx bx-download'></i><span>Exportar</span></button>
+            </div>
+            <div class="cont_filtros"><div class="filtro-grupo"><label for="filtroCategoria"><i class='bx bx-filter-alt'></i> Categoría</label><select id="filtroCategoria"><option value="">Todas las categorías</option></select></div><div class="filtro-estados" aria-label="Filtrar por nivel de stock"><span class="filter-label">Nivel de stock</span><button type="button" class="estado-btn active" data-status="Todos">Todos</button><button type="button" class="estado-btn" data-status="Bajo">Bajo</button><button type="button" class="estado-btn" data-status="Medio">Medio</button><button type="button" class="estado-btn" data-status="Bueno">Bueno</button></div></div>
+        </section>
+
+        <div class="cont_tabla"><div class="table-scroll"><table><thead><tr><th>Código</th><th>Nombre</th><th>Cantidad</th><th>Precio</th><th>Estado</th><th>Editar</th><th>Eliminar</th></tr></thead><tbody></tbody></table></div></div>
+    </main>
+
+    <!-- Ventana Modal para Agregar Insumo -->
+    <div id="modalProducto" class="modal-container">
+<div class="modal-content"><header><h2>Agregar Productos</h2><i class='bx bx-x' id="cerrarModal"></i></header>
+<form id="formProducto">
+<div class="input-group"><label for="codigo">Código</label><input id="codigo" type="text" required placeholder="Código del producto"></div><div class="input-group"><label for="nombre">Nombre</label><input id="nombre" type="text" required placeholder="Nombre del producto"></div><div class="input-group"><label for="cantidad">Cantidad</label><input id="cantidad" type="number" required placeholder="Cantidad"></div><div class="input-group"><label for="precio">Precio</label><input id="precio" type="number" required placeholder="Precio"></div><div class="input-group"><label for="estado">Estado</label><input id="estado" type="text" required placeholder="Activo / Inactivo"></div>
+<div class="modal-buttons"><button type="button" class="btn-secundario" id="btnCancelar">Cancelar</button><button type="submit" class="btn-primario">Guardar</button></div>
+</form></div></div>
+<script src="../shared/auditoria.js"></script>
+<script src="../shared/actualizacion-tiempo-real.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="../shared/navegacion.js"></script>
+<script src="productos.js"></script></body></html>

@@ -1,0 +1,80 @@
+.sidebar-standard {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    width: 250px;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    overflow: visible;
+    background: linear-gradient(165deg, #12304a 0%, #176b86 58%, var(--module-accent, #27b7f5) 140%);
+    box-shadow: 10px 0 30px rgba(18, 48, 74, 0.14);
+    transition: all .5s ease;
+}
+
+.sidebar-standard.close { width: 88px; }
+.sidebar-standard header { position: relative; margin-bottom: 0; color: #f7fcff; }
+.sidebar-standard .imagen_texto { display: flex; align-items: center; }
+.sidebar-standard .imagen_texto img { width: 50px; border-radius: 8px; }
+.sidebar-standard .imagen { min-width: 60px; display: flex; align-items: center; }
+.sidebar-standard .texto { color: #f7fcff; font-size: 16px; font-weight: 500; white-space: nowrap; transition: all .3s ease; }
+.sidebar-standard.close .texto { opacity: 0; pointer-events: none; }
+.sidebar-standard .texto_titulo { display: flex; flex-direction: column; }
+.sidebar-standard .texto_titulo .titulo { color: #f7fcff; }
+.sidebar-standard .texto_titulo .subtitulo { font-size: 12px; font-weight: 400; color: rgba(247, 252, 255, 0.75); }
+.sidebar-standard .toggle { position: absolute; right: -25px; top: 50%; z-index: 1001; display: flex; align-items: center; justify-content: center; width: 25px; height: 25px; transform: translateY(-50%) rotate(180deg); border-radius: 50%; background: var(--module-accent, var(--marqueza-cyan, #27b7f5)); color: #fff; font-size: 22px; cursor: pointer; box-shadow: 0 7px 18px rgba(18, 48, 74, 0.24); }
+.sidebar-standard.close .toggle { transform: translateY(-50%); }
+.sidebar-standard .barra_menu { height: calc(100% - 80px); display: flex; flex-direction: column; justify-content: space-between; color: #f7fcff; }
+.sidebar-standard .menu, .sidebar-standard .links_menu, .sidebar-standard .boton-contenido { width: 100%; margin: 0; padding: 0; }
+.sidebar-standard li { height: 50px; margin-top: 10px; display: flex; align-items: center; list-style: none; }
+.sidebar-standard li .icon { flex: 0 0 60px; display: flex; align-items: center; justify-content: center; min-width: 60px; color: #f7fcff; font-size: 20px; }
+.sidebar-standard li a { display: flex; align-items: center; width: 100%; height: 100%; border-radius: 6px; text-decoration: none; transition: all .3s ease; }
+.sidebar-standard li a .texto { flex: 1; overflow: hidden; color: #f7fcff; }
+.sidebar-standard li a:hover,
+.sidebar-standard li a[aria-current="page"]:hover { background: rgba(255, 255, 255, 0.2); transform: translateX(3px); }
+.sidebar-standard li a[aria-current="page"] { background: rgba(255, 255, 255, 0.16); box-shadow: inset 3px 0 0 #fff; }
+.sidebar-standard li a:hover .icon, .sidebar-standard li a:hover .texto { color: #ffffff; }
+body.dark .sidebar-standard li a:hover .icon, body.dark .sidebar-standard li a:hover .texto { color: #ffffff; }
+.sidebar-standard .modo { position: relative; border-radius: 6px; background: rgba(255, 255, 255, 0.13); display: flex; align-items: center; min-width: 0; padding-right: 64px; }
+.sidebar-standard .sol_luna { position: relative; display: flex; align-items: center; justify-content: center; width: 60px; height: 50px; flex-shrink: 0; }
+.sidebar-standard .sol_luna i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #f7fcff; transition: opacity .3s ease; }
+.sidebar-standard .modo .texto { color: #f7fcff; }
+.sidebar-standard .modo i.sol { opacity: 0; }
+body.dark .sidebar-standard .modo i.sol { opacity: 1; }
+body.dark .sidebar-standard .modo i.luna { opacity: 0; }
+body.dark .sidebar-standard .modo i,
+body.dark .sidebar-standard .modo .texto { color: #f7fcff; }
+.sidebar-standard .modo_texto { margin: 0; color: #f7fcff; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-standard .toggle_switch { position: absolute; right: 0; display: flex; align-items: center; justify-content: center; width: 60px; height: 100%; border-radius: 6px; cursor: pointer; background: transparent; }
+.sidebar-standard .toggle_switch .switch { position: relative; display: block; width: 44px; height: 22px; border-radius: 25px; background: rgba(255, 255, 255, 0.35); }
+.sidebar-standard .toggle_switch .switch::before { content: ''; position: absolute; top: 50%; left: 5px; width: 15px; height: 15px; transform: translateY(-50%); border-radius: 50%; background: #ffffff; transition: all .3s ease; }
+body.dark .sidebar-standard .toggle_switch .switch::before { left: 25px; }
+
+/* Ocultar sol_luna al colapsar la barra lateral para evitar que el icono se vea detrás del botón */
+.sidebar-standard.close .modo { padding-right: 0 !important; justify-content: center !important; }
+.sidebar-standard.close .sol_luna { display: none !important; }
+.sidebar-standard.close .modo_texto { display: none !important; }
+.sidebar-standard.close .toggle_switch { position: static !important; width: 100% !important; min-width: 100% !important; height: 100% !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+.sidebar-standard .hamburger { display: none; }
+
+@media (max-width: 1024px) {
+    body:has(.sidebar-standard) { padding-left: 0; }
+    .sidebar-standard, .sidebar-standard.close { width: 100%; height: 56px; padding: 0 12px; }
+    .sidebar-standard header { height: 56px; display: flex; align-items: center; }
+    .sidebar-standard .toggle { display: none; }
+    .sidebar-standard .imagen_texto img { width: 38px; }
+    .sidebar-standard .texto_titulo .subtitulo { display: none; }
+    .sidebar-standard .hamburger { display: flex; flex-direction: column; justify-content: space-between; width: 28px; height: 22px; margin-left: auto; padding: 2px 0; cursor: pointer; }
+    .sidebar-standard .hamburger span { display: block; width: 100%; height: 3px; border-radius: 4px; background: #fff; }
+    .sidebar-standard .barra_menu { display: none; height: auto; }
+    .sidebar-standard.open { height: auto; min-height: 56px; }
+    .sidebar-standard.open .barra_menu { display: flex; padding: 8px 0 12px; }
+    .sidebar-standard.open .texto { opacity: 1; pointer-events: auto; }
+    .sidebar-standard li { height: 44px; margin-top: 4px; }
+    .sidebar-standard li .icon { flex-basis: 48px; min-width: 48px; font-size: 18px; }
+    .sidebar-standard .boton-contenido { display: flex; gap: 8px; padding-top: 8px; }
+    .sidebar-standard .boton-contenido li { flex: 1; margin-top: 0; }
+    .sidebar-standard .sol_luna { height: 44px; }
+}
+
