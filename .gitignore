@@ -157,6 +157,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Agentes / notas locales (no versionar)
+AGENTS.md
+
 # Spyder project settings
 .spyderproject
 .spyproject
