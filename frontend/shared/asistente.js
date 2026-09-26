@@ -33,19 +33,25 @@
         return modules.find((module) => module.aliases.some((alias) => normalized.includes(normalize(alias))));
     }
 
-    function localCount(module) {
+    async function apiCount(module) {
         if (!module.key) return null;
-        try {
-            const value = localStorage.getItem(module.key);
-            if (value === null) return 0;
-            const records = JSON.parse(value);
-            return Array.isArray(records) ? records.length : null;
-        } catch {
-            return null;
-        }
+        const endpoints = {
+            marqueza_insumos: "/insumos/",
+            marqueza_productos: "/productos/",
+            marqueza_ventas: "/ventas/",
+            marqueza_cotizaciones: "/cotizaciones/",
+            marqueza_clientes: "/clientes/",
+            marqueza_proveedores: "/proveedores/",
+            marqueza_usuarios: "/usuarios/",
+            marqueza_bitacora: "/auditoria/"
+        };
+        const endpoint = endpoints[module.key];
+        if (!endpoint) return null;
+        const records = await window.MarquezaApi.get(endpoint);
+        return Array.isArray(records) ? records.length : null;
     }
 
-    function answerQuestion(question) {
+    async function answerQuestion(question) {
         const normalized = normalize(question);
         const activeModule = currentModule();
         const targetModule = findModule(question) || activeModule;
@@ -55,11 +61,11 @@
         }
 
         if (/\b(api|backend|mysql|servidor|conecta|conexion|localstorage|almacenamiento local|guardan los datos|almacenan los datos|donde se guardan)\b/.test(normalized)) {
-            return "El backend de MARQUEZA usa Flask y MySQL, y expone una API REST. El frontend está hecho con HTML, CSS y JavaScript; varias pantallas todavía guardan sus registros en localStorage. Por eso, un dato visible en el navegador no necesariamente está sincronizado con MySQL.";
+            return "La interfaz consulta la API Flask, que persiste los registros operativos en MySQL. El tema visual y los datos mínimos de sesión permanecen en este navegador.";
         }
 
         if (/\b(proyecto|marqueza|sistema|aplicacion|tecnologia|frontend|modulos|modulo)\b/.test(normalized)) {
-            return "MARQUEZA es una aplicación de gestión para una empresa de confecciones. Reúne clientes, proveedores, productos, insumos, ventas, cotizaciones, usuarios y registro de actividad. Su propósito es centralizar contactos, inventario y seguimiento comercial. El frontend usa HTML, CSS y JavaScript; el backend usa Flask y MySQL, aunque algunas pantallas aún trabajan con datos locales.";
+            return "MARQUEZA es una aplicación de gestión para una empresa de confecciones. Reúne clientes, proveedores, productos, insumos, ventas, cotizaciones, usuarios y actividad. La interfaz consulta la API Flask y los registros operativos se guardan en MySQL.";
         }
 
         if (/\b(estado|estados|pendiente|enviada|aprobada|rechazada)\b/.test(normalized) && targetModule.name === "Cotizaciones") {
@@ -79,17 +85,23 @@
         }
 
         if (/\b(cuantos|cuantas|total|cantidad|numero|registros)\b/.test(normalized) || (/\b(hay|existen)\b/.test(normalized) && findModule(question))) {
-            const count = localCount(targetModule);
+            let count;
+            try {
+                count = await apiCount(targetModule);
+            } catch {
+                return `No pude consultar la API para contar ${targetModule.name}. Revisa la conexión e inténtalo de nuevo.`;
+            }
             if (count === null) {
-                return `No encuentro datos de ${targetModule.name} en el almacenamiento local de este navegador, así que no puedo confirmar un total.`;
+                return `No hay un conteo único para ${targetModule.name}; consulta un módulo de registros específico.`;
             }
             const countLabel = count === 1 ? targetModule.singular || targetModule.name.toLowerCase() : targetModule.plural || targetModule.name.toLowerCase();
-            return `Hay ${count} ${countLabel} en el almacenamiento local de este navegador.`;
+            return `La API registra ${count} ${countLabel}.`;
         }
 
         if (/\b(que hace|que puedo hacer|que hay en|esta pagina|esta pantalla|para que sirve|funciona)\b/.test(normalized)) {
-            const count = localCount(targetModule);
-            const countText = count === null ? "" : ` Actualmente hay ${count} registros locales.`;
+            let count = null;
+            try { count = await apiCount(targetModule); } catch { /* Keep the help text available when the API is offline. */ }
+            const countText = count === null ? "" : ` Actualmente hay ${count} registros en la API.`;
             return `Esta es la pantalla de ${targetModule.name}: ${targetModule.description}. ${targetModule.details}${countText}`;
         }
 
@@ -101,12 +113,13 @@
         }
 
         if (findModule(question)) {
-            const count = localCount(targetModule);
-            const countText = count === null ? " No hay datos locales disponibles para contar." : ` Hay ${count} registros locales.`;
+            let count = null;
+            try { count = await apiCount(targetModule); } catch { /* Keep the help text available when the API is offline. */ }
+            const countText = count === null ? " No hay conteo disponible desde la API." : ` Hay ${count} registros en la API.`;
             return `El módulo ${targetModule.name} se usa para ${targetModule.description.replace(/^la gestión de |^el registro y consulta de |^la creación y seguimiento de |^los datos de contacto de |^la información de |^las cuentas y roles de acceso al sistema/, "")}. ${targetModule.details}${countText}`;
         }
 
-        return "Puedo responder sobre el proyecto, esta pantalla y los conteos guardados localmente. No tengo un servicio de IA conectado ni acceso a información fuera de la aplicación. Prueba preguntando, por ejemplo: ¿Qué hace esta página? o ¿Cuántos clientes hay?";
+        return "Puedo responder sobre el proyecto, esta pantalla y los conteos consultados en la API. No tengo un servicio de IA conectado ni acceso a información fuera de la aplicación. Prueba preguntando, por ejemplo: ¿Qué hace esta página? o ¿Cuántos clientes hay?";
     }
 
     function suggestedQuestions(module) {
@@ -193,14 +206,20 @@
         const message = createElement("p", `marqueza-assistant-message is-${sender}`, text);
         messages.appendChild(message);
         messages.scrollTop = messages.scrollHeight;
+        return message;
     }
 
-    function submitQuestion(question) {
+    async function submitQuestion(question) {
         const value = question.trim();
         if (!value) return;
         addMessage(value, "user");
         input.value = "";
-        addMessage(answerQuestion(value), "assistant");
+        const response = addMessage("Consultando…", "assistant");
+        try {
+            response.textContent = await answerQuestion(value);
+        } catch (error) {
+            response.textContent = `No pude consultar la información: ${error.message}`;
+        }
         input.focus();
     }
 
@@ -216,7 +235,7 @@
     closeButton.addEventListener("click", () => setOpen(false));
     form.addEventListener("submit", (event) => {
         event.preventDefault();
-        submitQuestion(input.value);
+        void submitQuestion(input.value);
     });
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && !panel.hidden) {

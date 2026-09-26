@@ -9,7 +9,7 @@
             <div>
                 <span class="audit-eyebrow">Seguridad y seguimiento</span>
                 <h1>Registro de actividad</h1>
-                <p>Accesos, cambios y errores registrados en este navegador.</p>
+                <p>Accesos, cambios y errores centralizados en la base de datos.</p>
             </div>
             <div class="audit-actions">
                 <button type="button" class="audit-icon-button" id="auditRefresh" title="Actualizar" aria-label="Actualizar"><i class="bx bx-refresh"></i></button>
@@ -42,7 +42,7 @@
             </div>
             <p class="audit-empty" id="auditEmpty" hidden>No hay eventos que coincidan con los filtros.</p>
         </section>
-        <p class="audit-note"><i class="bx bx-info-circle" aria-hidden="true"></i> Estos registros se guardan en el almacenamiento local de este navegador; no son una bitácora central ni resistente a modificaciones.</p>
+        <p class="audit-note"><i class="bx bx-info-circle" aria-hidden="true"></i> Los eventos se consultan desde la API central de MARQUEZA.</p>
     `;
 
     const elements = {
@@ -137,9 +137,18 @@
 
     elements.search.addEventListener("input", render);
     elements.filter.addEventListener("change", render);
-    document.getElementById("auditRefresh").addEventListener("click", render);
+    const refresh = async () => {
+        try {
+            await window.MarquezaAudit.load();
+            render();
+        } catch (error) {
+            elements.empty.hidden = false;
+            elements.empty.textContent = `No se pudo consultar la bitácora: ${error.message}`;
+        }
+    };
+    document.getElementById("auditRefresh").addEventListener("click", refresh);
     document.getElementById("auditExport").addEventListener("click", exportCsv);
-    window.addEventListener("storage", (event) => { if (event.key === "marqueza_bitacora") render(); });
     window.addEventListener("marqueza:audit", render);
-    render();
+    window.addEventListener("focus", refresh);
+    refresh();
 })();

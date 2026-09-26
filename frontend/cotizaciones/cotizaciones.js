@@ -10,29 +10,75 @@ class CotizacionesPage {
         this.clientSelect = document.getElementById("quoteCliente");
         this.itemsContainer = document.getElementById("quoteItems");
         this.products = [];
+        this.quotes = [];
+        this.data = {};
+        this.users = [];
     }
 
-    init() {
+    async init() {
         this.bindEvents();
-        this.loadClients();
-        this.loadProducts();
-        this.setDefaultDate();
-        this.updateDashboard();
-        this.renderQuotes();
-    }
-
-    read(key, fallback = []) {
         try {
-            const value = JSON.parse(localStorage.getItem(key) || "null");
-            return Array.isArray(value) ? value : fallback;
-        } catch {
-            return fallback;
+            await this.refreshData();
+            this.setDefaultDate();
+            this.updateDashboard();
+            this.renderQuotes();
+        } catch (error) {
+            window.Swal?.fire({ icon: "error", title: "No se pudo cargar cotizaciones", text: error.message });
         }
     }
 
-    readQuotes() { return this.read(this.storageKey); }
+    async refreshData() {
+        const [quotes, clientRows, people, products, insumos, sales, saleLines, users] = await Promise.all([
+            window.MarquezaApi.get("/cotizaciones/"),
+            window.MarquezaApi.get("/clientes/"),
+            window.MarquezaApi.get("/personas/"),
+            window.MarquezaApi.get("/productos/"),
+            window.MarquezaApi.get("/insumos/"),
+            window.MarquezaApi.get("/ventas/"),
+            window.MarquezaApi.get("/ventas-productos/"),
+            window.MarquezaApi.get("/usuarios/")
+        ]);
+        const peopleById = new Map(people.map(person => [Number(person.id), person]));
+        const clients = clientRows.map(client => ({ ...client, nombre: peopleById.get(Number(client.per_id))?.nombre || "" }));
+        const productsById = new Map(products.map(product => [Number(product.id), product]));
+        const linesBySale = new Map();
+        saleLines.forEach(line => {
+            const current = linesBySale.get(Number(line.vent_id)) || [];
+            current.push(line);
+            linesBySale.set(Number(line.vent_id), current);
+        });
+        this.products = products;
+        this.users = users;
+        this.quotes = quotes.map(quote => ({
+            ...quote,
+            clienteId: Number(quote.cli_id),
+            cliente: clients.find(client => Number(client.id) === Number(quote.cli_id))?.nombre || "",
+            fecha: quote.fecha || "",
+            producto: (quote.productos || []).map(item => item.nombre).join(", "),
+            total: Number(quote.total_pagar || 0),
+            precioUnitario: Number(quote.precio || 0)
+        }));
+        this.data = {
+            marqueza_clientes: clients,
+            marqueza_productos: products.map(product => ({ ...product, precio: product.precio, categoria: "Sin categoría" })),
+            marqueza_insumos: insumos.map(item => ({ ...item, precioUnitario: item.precio })),
+            marqueza_ventas: sales.map(sale => {
+                const lines = linesBySale.get(Number(sale.id)) || [];
+                return {
+                    ...sale,
+                    total: lines.reduce((sum, line) => sum + Number(line.precio || productsById.get(Number(line.prod_id))?.precio || 0) * Number(line.cantidad || 0), 0),
+                    cantidad: lines.reduce((sum, line) => sum + Number(line.cantidad || 0), 0)
+                };
+            }),
+            marqueza_usuarios: users
+        };
+        this.loadClients();
+        this.loadProducts();
+    }
 
-    saveQuotes(quotes) { localStorage.setItem(this.storageKey, JSON.stringify(quotes)); }
+    read(key, fallback = []) { return this.data[key] || fallback; }
+
+    readQuotes() { return this.quotes; }
 
     money(value) {
         return Number(value || 0).toLocaleString("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
@@ -47,9 +93,9 @@ class CotizacionesPage {
         this.clientSelect.replaceChildren(new Option("Selecciona un cliente", ""));
         clients.forEach(client => {
             const name = (client.nombre || "").trim();
-            if (name) this.clientSelect.appendChild(new Option(name, name));
+            if (name) this.clientSelect.appendChild(new Option(name, String(client.id)));
         });
-        this.clientSelect.value = selectedClient;
+        this.clientSelect.value = String(selectedClient || "");
     }
 
     loadProducts() {
@@ -59,12 +105,13 @@ class CotizacionesPage {
     productOptions(selected = "") {
         const options = [new Option("Selecciona un producto", "")];
         this.products.forEach(product => {
-            const value = String(product.nombre || product.codigo || "").trim();
+            const value = String(product.id);
             if (!value) return;
-            const label = product.codigo ? `${product.codigo} - ${value}` : value;
+            const label = product.codigo ? `${product.codigo} - ${product.nombre}` : product.nombre;
             const option = new Option(label, value);
             option.dataset.price = String(Number(product.precio || 0));
             option.dataset.code = String(product.codigo || "");
+            option.dataset.name = String(product.nombre || "");
             options.push(option);
         });
         options.forEach(option => { if (option.value === selected) option.selected = true; });
@@ -76,11 +123,13 @@ class CotizacionesPage {
         line.className = "product-line";
         const select = document.createElement("select");
         select.required = true;
-        select.append(...this.productOptions(item.nombre));
+        const selectedProduct = this.products.find(product => Number(product.id) === Number(item.producto_id)) ||
+            this.products.find(product => product.codigo === item.codigo || product.nombre === item.nombre);
+        select.append(...this.productOptions(selectedProduct?.id || ""));
         const quantity = document.createElement("input");
         quantity.type = "number"; quantity.min = "1"; quantity.value = item.cantidad || 1; quantity.required = true;
         const price = document.createElement("input");
-        price.type = "number"; price.min = "0"; price.step = "0.01"; price.value = item.precio ?? ""; price.required = true;
+        price.type = "number"; price.min = "0"; price.step = "1"; price.value = item.precio ?? ""; price.required = true;
         select.addEventListener("change", () => {
             const selected = select.selectedOptions[0];
             if (selected?.dataset.price !== undefined) price.value = selected.dataset.price;
@@ -377,22 +426,58 @@ class CotizacionesPage {
         const products = [...this.itemsContainer.querySelectorAll(".product-line")].map(line => {
             const select = line.querySelector("select");
             const inputs = line.querySelectorAll("input");
-            return { codigo: select.selectedOptions[0]?.dataset.code || "", nombre: select.value, cantidad: Number(inputs[0].value), precio: Number(inputs[1].value) };
+            return {
+                producto_id: Number(select.value),
+                codigo: select.selectedOptions[0]?.dataset.code || "",
+                nombre: select.selectedOptions[0]?.dataset.name || "",
+                cantidad: Number(inputs[0].value),
+                precio: Number(inputs[1].value)
+            };
         });
-        if (!products.length || products.some(item => !item.nombre || !Number.isFinite(item.cantidad) || item.cantidad < 1 || !Number.isFinite(item.precio) || item.precio < 0)) {
+        if (!products.length || products.some(item => !item.producto_id || !item.nombre || !Number.isFinite(item.cantidad) || item.cantidad < 1 || !Number.isFinite(item.precio) || item.precio < 0)) {
             window.Swal?.fire({ icon: "warning", title: "Datos inválidos", text: "Selecciona productos e ingresa cantidades y precios válidos." });
             return;
         }
-        const quote = { fecha: document.getElementById("quoteFecha").value, cliente: document.getElementById("quoteCliente").value.trim(), producto: products.map(item => item.nombre).join(", "), cantidad: products.reduce((sum, item) => sum + item.cantidad, 0), precioUnitario: products[0].precio, total: products.reduce((sum, item) => sum + item.cantidad * item.precio, 0), productos: products, estado: document.getElementById("quoteEstado").value, notas: document.getElementById("quoteNotas").value.trim() };
+        const quote = {
+            fecha: document.getElementById("quoteFecha").value,
+            clienteId: Number(this.clientSelect.value),
+            cliente: this.clientSelect.selectedOptions[0]?.textContent || "",
+            producto: products.map(item => item.nombre).join(", "),
+            cantidad: products.reduce((sum, item) => sum + item.cantidad, 0),
+            precioUnitario: products[0].precio,
+            total: products.reduce((sum, item) => sum + item.cantidad * item.precio, 0),
+            productos,
+            estado: document.getElementById("quoteEstado").value,
+            notas: document.getElementById("quoteNotas").value.trim()
+        };
         const index = Number(document.getElementById("quoteIndex").value);
-        const quotes = this.readQuotes();
-        if (index >= 0) quotes[index] = quote; else quotes.unshift(quote);
-        window.MarquezaAudit?.recordChange(index >= 0 ? "update" : "create", this.storageKey, quote);
-        this.saveQuotes(quotes);
-        this.closeModal();
-        this.updateDashboard();
-        this.renderQuotes();
-        window.Swal?.fire({ icon: "success", title: index >= 0 ? "Cotización actualizada" : "Cotización guardada", text: "La información se guardó correctamente.", timer: 1600, showConfirmButton: false });
+        const existing = index >= 0 ? this.readQuotes()[index] : null;
+        const session = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+        const usuarioId = session?.id || this.users[0]?.id;
+        if (!quote.clienteId || !usuarioId) {
+            window.Swal?.fire({ icon: "warning", title: "Faltan relaciones", text: "Selecciona un cliente e inicia sesión para asociar la cotización." });
+            return;
+        }
+        const payload = {
+            fecha: quote.fecha,
+            estado: quote.estado,
+            notas: quote.notas,
+            usuario_id: usuarioId,
+            cliente_id: quote.clienteId,
+            total_pagar: quote.total,
+            productos
+        };
+        const request = existing
+            ? window.MarquezaApi.put(`/cotizaciones/${existing.id}`, payload)
+            : window.MarquezaApi.post("/cotizaciones/", payload);
+        request.then(async () => {
+            window.MarquezaAudit?.recordChange(existing ? "update" : "create", this.storageKey, { cliente: quote.cliente, total: quote.total });
+            await this.refreshData();
+            this.closeModal();
+            this.updateDashboard();
+            this.renderQuotes();
+            window.Swal?.fire({ icon: "success", title: existing ? "Cotización actualizada" : "Cotización guardada", text: "La información se guardó en la base de datos.", timer: 1600, showConfirmButton: false });
+        }).catch(error => window.Swal?.fire({ icon: "error", title: "No se pudo guardar", text: error.message }));
     }
 
     bindEvents() {
@@ -411,21 +496,31 @@ class CotizacionesPage {
             if (button.dataset.action === "download") { this.downloadPdf(index); return; }
             if (button.dataset.action === "edit") this.openModal(index);
             if (button.dataset.action === "delete") {
-                const removeQuote = () => { const quotes = this.readQuotes(); const [quote] = quotes.splice(index, 1); window.MarquezaAudit?.recordChange("delete", this.storageKey, quote); this.saveQuotes(quotes); this.updateDashboard(); this.renderQuotes(); window.Swal?.fire({ icon: "success", title: "Cotización eliminada", text: "La cotización se eliminó correctamente.", timer: 1600, showConfirmButton: false }); };
-                if (window.Swal) window.Swal.fire({ icon: "warning", title: "¿Eliminar cotización?", text: "Esta acción no se puede deshacer.", showCancelButton: true, confirmButtonText: "Eliminar", cancelButtonText: "Cancelar", confirmButtonColor: "#d4554d" }).then(result => { if (result.isConfirmed) removeQuote(); });
+                const quote = this.readQuotes()[index];
+                if (window.Swal) window.Swal.fire({ icon: "warning", title: "¿Eliminar cotización?", text: "Esta acción no se puede deshacer.", showCancelButton: true, confirmButtonText: "Eliminar", cancelButtonText: "Cancelar", confirmButtonColor: "#d4554d" }).then(async result => {
+                    if (!result.isConfirmed) return;
+                    try {
+                        await window.MarquezaApi.delete(`/cotizaciones/${quote.id}`);
+                        window.MarquezaAudit?.recordChange("delete", this.storageKey, { cliente: quote.cliente, total: quote.total });
+                        await this.refreshData();
+                        this.updateDashboard();
+                        this.renderQuotes();
+                        window.Swal.fire({ icon: "success", title: "Cotización eliminada", text: "La cotización se eliminó correctamente.", timer: 1600, showConfirmButton: false });
+                    } catch (error) {
+                        window.Swal.fire({ icon: "error", title: "No se pudo eliminar", text: error.message });
+                    }
+                });
             }
         });
         this.modal.addEventListener("click", event => { if (event.target === this.modal) this.closeModal(); });
-        window.MarquezaRealtime?.subscribe(({ key }) => {
-            if (key === "marqueza_productos") {
-                this.loadProducts();
-                this.itemsContainer.querySelectorAll(".product-line select").forEach(select => {
-                    const selected = select.value;
-                    select.replaceChildren(...this.productOptions(selected));
-                });
+        window.addEventListener("focus", async () => {
+            try {
+                await this.refreshData();
+                this.updateDashboard();
+                this.renderQuotes();
+            } catch (error) {
+                window.Swal?.fire({ icon: "error", title: "No se pudo actualizar", text: error.message });
             }
-            if (key === "marqueza_clientes") this.loadClients(this.clientSelect.value);
-            if (key === this.storageKey) { this.updateDashboard(); this.renderQuotes(); }
         });
     }
 }

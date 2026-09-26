@@ -1,13 +1,9 @@
 const body = document.body;
 const sidebar = document.querySelector(".barra_lateral");
 const charts = [];
+let dashboardData = null;
 const read = (key) => {
-    try {
-        const value = JSON.parse(localStorage.getItem(key) || "[]");
-        return Array.isArray(value) ? value : [];
-    } catch {
-        return [];
-    }
+    return dashboardData?.[key] || [];
 };
 
 const number = (value) => Number(value || 0).toLocaleString("es-CO");
@@ -41,6 +37,51 @@ function getDashboardData() {
     const inventoryValue = productos.reduce((total, item) => total + Number(item.cantidad || 0) * Number(item.precio || 0), 0);
     const supplyValue = insumos.reduce((total, item) => total + Number(item.cantidad || 0) * Number(item.precioUnitario || 0), 0);
     return { insumos, productos, ventas, clientes, proveedores, usuarios, cotizaciones, stock, inventoryValue, supplyValue };
+}
+
+async function loadDashboard() {
+    try {
+        const [insumoRows, productRows, salesRows, saleLines, clientRows, supplierRows, users, quotes, details, people] = await Promise.all([
+            window.MarquezaApi.get("/insumos/"),
+            window.MarquezaApi.get("/productos/"),
+            window.MarquezaApi.get("/ventas/"),
+            window.MarquezaApi.get("/ventas-productos/"),
+            window.MarquezaApi.get("/clientes/"),
+            window.MarquezaApi.get("/proveedores/"),
+            window.MarquezaApi.get("/usuarios/"),
+            window.MarquezaApi.get("/cotizaciones/"),
+            window.MarquezaApi.get("/detalles-etc/"),
+            window.MarquezaApi.get("/personas/")
+        ]);
+        const categories = new Map(details.map(item => [Number(item.id), item.nombre]));
+        const peopleById = new Map(people.map(item => [Number(item.id), item]));
+        const productsById = new Map(productRows.map(item => [Number(item.id), item]));
+        const linesBySale = new Map();
+        saleLines.forEach(line => {
+            const lines = linesBySale.get(Number(line.vent_id)) || [];
+            lines.push(line);
+            linesBySale.set(Number(line.vent_id), lines);
+        });
+        const sales = salesRows.map(sale => {
+            const lines = linesBySale.get(Number(sale.id)) || [];
+            return {
+                ...sale,
+                total: lines.reduce((sum, line) => sum + Number(line.precio || productsById.get(Number(line.prod_id))?.precio || 0) * Number(line.cantidad || 0), 0)
+            };
+        });
+        dashboardData = {
+            marqueza_insumos: insumoRows.map(item => ({ ...item, precioUnitario: item.precio, categoria: categories.get(Number(item.det_etc_id)) || "Sin categoría" })),
+            marqueza_productos: productRows.map(item => ({ ...item, categoria: categories.get(Number(item.det_etc_id)) || "Sin categoría" })),
+            marqueza_ventas: sales,
+            marqueza_clientes: clientRows.map(item => ({ ...item, nombre: peopleById.get(Number(item.per_id))?.nombre || "" })),
+            marqueza_proveedores: supplierRows,
+            marqueza_usuarios: users,
+            marqueza_cotizaciones: quotes.map(item => ({ ...item, total: Number(item.total || item.total_pagar || 0) }))
+        };
+        initCharts();
+    } catch (error) {
+        window.Swal?.fire({ icon: "error", title: "No se pudo cargar el tablero", text: error.message });
+    }
 }
 
 function updateMetrics(data) {
@@ -128,5 +169,5 @@ document.getElementById("hamburger")?.addEventListener("click", () => setTimeout
 document.addEventListener("DOMContentLoaded", () => new MarquezaAppShell().init());
 updateLayout();
 window.addEventListener("resize", () => { clearTimeout(window.dashboardResize); window.dashboardResize = setTimeout(updateLayout, 120); });
-window.MarquezaRealtime?.subscribe(() => initCharts());
-window.addEventListener("load", initCharts);
+window.addEventListener("focus", loadDashboard);
+window.addEventListener("load", loadDashboard);

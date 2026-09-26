@@ -165,8 +165,9 @@
                 <div class="input-group">
                     <label for="rol">Rol</label>
                     <select id="rol" required>
-                        <option value="Administrador">Administrador</option>
-                        <option value="Empleado">Empleado</option>
+                        <option value="ADMINISTRADOR">Administrador</option>
+                        <option value="VENDEDOR">Vendedor</option>
+                        <option value="AUXILIAR">Auxiliar</option>
                     </select>
                 </div>
                 <div class="input-group">
@@ -205,8 +206,9 @@
                 <div class="input-group">
                     <label for="editRol">Rol</label>
                     <select id="editRol" required>
-                        <option value="Administrador">Administrador</option>
-                        <option value="Empleado">Empleado</option>
+                        <option value="ADMINISTRADOR">Administrador</option>
+                        <option value="VENDEDOR">Vendedor</option>
+                        <option value="AUXILIAR">Auxiliar</option>
                     </select>
                 </div>
                 <div class="input-group">
@@ -222,6 +224,7 @@
     </div>
 
     <!-- Enlaza el archivo JavaScript personalizado para la lógica del dashboard -->
+    <script src="../shared/api.js"></script>
     <script src="../shared/auditoria.js"></script>
     <script src="../shared/actualizacion-tiempo-real.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

@@ -1,6 +1,8 @@
 class MarquezaCrudPage {
     constructor({ storageKey, modalId, formId, fields, columns }) {
         this.storageKey = storageKey;
+        this.adapter = window.MarquezaCrudAdapters?.[storageKey];
+        this.records = [];
         this.modal = document.getElementById(modalId);
         this.form = document.getElementById(formId);
         this.body = document.querySelector(".cont_tabla tbody");
@@ -29,19 +31,18 @@ class MarquezaCrudPage {
         window.MarquezaRealtime?.subscribe(({ key }) => {
             if (key === this.storageKey) this.render(this.searchInput?.value || "");
         });
-        this.render();
+        this.refresh().catch(error => this.showApiError(error));
     }
 
-    readRecords() {
-        try {
-            return JSON.parse(localStorage.getItem(this.storageKey) || "[]");
-        } catch {
-            return [];
-        }
+    readRecords() { return this.records; }
+
+    async refresh() {
+        this.records = await this.adapter.list();
+        this.render(this.searchInput?.value || "");
     }
 
-    writeRecords(records) {
-        localStorage.setItem(this.storageKey, JSON.stringify(records));
+    showApiError(error) {
+        this.notify({ icon: "error", title: "No se pudo conectar con la API", text: error.message });
     }
 
     notify(options) {
@@ -128,22 +129,25 @@ class MarquezaCrudPage {
         this.editIndex = -1;
     }
 
-    submit(event) {
+    async submit(event) {
         event.preventDefault();
-        const records = this.readRecords();
         const record = this.collectForm();
         if (Object.values(record).some((value) => !value)) {
             this.notify({ icon: "warning", title: "Campos incompletos", text: "Completa todos los campos antes de guardar." });
             return;
         }
         const editing = this.editIndex >= 0;
-        if (editing) records[this.editIndex] = record;
-        else records.push(record);
-        window.MarquezaAudit?.recordChange(editing ? "update" : "create", this.storageKey, record);
-        this.writeRecords(records);
-        this.closeModal();
-        this.render(this.searchInput?.value || "");
-        this.notify({ icon: "success", title: editing ? "Registro actualizado" : "Registro guardado", text: editing ? "Los cambios se guardaron correctamente." : "El registro se agregó correctamente.", timer: 1600, showConfirmButton: false });
+        const existing = editing ? this.readRecords()[this.editIndex] : null;
+        try {
+            if (editing) await this.adapter.update(existing, record);
+            else await this.adapter.create(record);
+            window.MarquezaAudit?.recordChange(editing ? "update" : "create", this.storageKey, record);
+            await this.refresh();
+            this.closeModal();
+            this.notify({ icon: "success", title: editing ? "Registro actualizado" : "Registro guardado", text: editing ? "Los cambios se guardaron correctamente." : "El registro se agregó correctamente.", timer: 1600, showConfirmButton: false });
+        } catch (error) {
+            this.showApiError(error);
+        }
     }
 
     async handleRowAction(event) {
@@ -158,12 +162,15 @@ class MarquezaCrudPage {
         if (!window.Swal) return;
         const result = await window.Swal.fire({ icon: "warning", title: "¿Eliminar registro?", text: "Esta acción no se puede deshacer.", showCancelButton: true, confirmButtonText: "Eliminar", cancelButtonText: "Cancelar", confirmButtonColor: "#d4554d" });
         if (!result.isConfirmed) return;
-        const records = this.readRecords();
-        const [record] = records.splice(index, 1);
-        window.MarquezaAudit?.recordChange("delete", this.storageKey, record);
-        this.writeRecords(records);
-        this.render(this.searchInput?.value || "");
-        this.notify({ icon: "success", title: "Registro eliminado", text: "El registro se eliminó correctamente.", timer: 1600, showConfirmButton: false });
+        const record = this.readRecords()[index];
+        try {
+            await this.adapter.delete(record);
+            window.MarquezaAudit?.recordChange("delete", this.storageKey, record);
+            await this.refresh();
+            this.notify({ icon: "success", title: "Registro eliminado", text: "El registro se eliminó correctamente.", timer: 1600, showConfirmButton: false });
+        } catch (error) {
+            this.showApiError(error);
+        }
     }
 }
 

@@ -5,7 +5,7 @@
      • Hamburger + menú desplegable (tablet / móvil ≤ 1024 px): Controla la barra superior responsive.
      • Drag lateral (solo desktop): Permite arrastrar la barra lateral para colapsarla.
      • Modo oscuro / claro: Cambia el tema visual de la aplicación.
-     • Gestión de Insumos: CRUD (Crear, Leer, Actualizar, Eliminar) usando LocalStorage.
+    • Gestión de Insumos: CRUD (Crear, Leer, Actualizar, Eliminar) usando la API.
    ============================================================ */
 
 // --- Selección de elementos del DOM para la interfaz general ---
@@ -166,6 +166,11 @@ sidebar.addEventListener("mouseleave", () => {
    GESTIÓN DE INSUMOS CON LOCAL STORAGE
    ───────────────────────────────────────────────────────── */
 const STORAGE_KEY = 'marqueza_insumos';
+let insumos = [];
+let proveedores = [];
+let personasById = new Map();
+let categorias = [];
+let usuarios = [];
 const tableBody = document.querySelector(".cont_tabla tbody");
 const btnAgregar = document.querySelector(".agregar");
 const searchInput = document.querySelector(".cont_busqueda input");
@@ -184,43 +189,47 @@ const editProveedorSelect = document.getElementById("editProveedor");
 const btnCerrarEditModal = document.getElementById("cerrarEditModal");
 const btnCancelarEdit = document.getElementById("btnCancelarEdit");
 
-const getInsumos = () => {
-    const storedData = localStorage.getItem(STORAGE_KEY);
-    if (storedData) {
-        try {
-            const parsed = JSON.parse(storedData);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            localStorage.removeItem(STORAGE_KEY);
-        }
-    }
-    return [
-        { nombre: 'Tela algodón', categoria: 'Tela', cantidad: 25, unidad: 'metros', precioUnitario: 12.50, estado: 'Disponible' },
-        { nombre: 'Botones negros', categoria: 'Complementos', cantidad: 120, unidad: 'piezas', precioUnitario: 0.15, estado: 'Disponible' }
-    ];
-};
+const getInsumos = () => insumos;
 
-const saveInsumos = (insumos) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(insumos));
-};
-
-const getProveedores = () => {
+const cargarDatos = async () => {
     try {
-        const proveedores = JSON.parse(localStorage.getItem("marqueza_proveedores") || "[]");
-        return Array.isArray(proveedores) ? proveedores : [];
-    } catch {
-        return [];
+        const [rows, supplierRows, people, details, users] = await Promise.all([
+            window.MarquezaApi.get("/insumos/"),
+            window.MarquezaApi.get("/proveedores/"),
+            window.MarquezaApi.get("/personas/"),
+            window.MarquezaApi.get("/detalles-etc/"),
+            window.MarquezaApi.get("/usuarios/")
+        ]);
+        proveedores = supplierRows;
+        personasById = new Map(people.map(person => [Number(person.id), person]));
+        categorias = details;
+        usuarios = users;
+        const categoriesById = new Map(details.map(item => [Number(item.id), item.nombre]));
+        insumos = rows.map(item => ({
+            ...item,
+            categoriaId: String(item.det_etc_id),
+            categoria: categoriesById.get(Number(item.det_etc_id)) || "Sin categoría",
+            proveedorId: String(item.prov_id),
+            proveedor: personasById.get(Number(supplierRows.find(supplier => Number(supplier.id) === Number(item.prov_id))?.per_id))?.nombre || "Sin proveedor",
+            usuarioId: Number(item.usua_id),
+            precioUnitario: Number(item.precio),
+            unidad: item.unidad || "unidad"
+        }));
+        cargarProveedores();
+        actualizarCategorias();
+        renderTabla(searchInput?.value || "");
+    } catch (error) {
+        Swal.fire({ icon: "error", title: "No se pudo cargar el inventario", text: error.message });
     }
 };
 
 const cargarProveedores = (selectedValue = "") => {
-    const proveedores = getProveedores();
     [proveedorSelect, editProveedorSelect].forEach(select => {
         if (!select) return;
         select.replaceChildren(new Option("Selecciona un proveedor", ""));
         proveedores.forEach(proveedor => {
-            const empresa = String(proveedor.empresa || "").trim();
-            if (empresa) select.appendChild(new Option(empresa, empresa));
+            const empresa = String(personasById.get(Number(proveedor.per_id))?.nombre || "").trim();
+            if (empresa) select.appendChild(new Option(empresa, String(proveedor.id)));
         });
         select.value = selectedValue;
     });
@@ -314,11 +323,16 @@ const renderTabla = () => {
 };
 
 const actualizarCategorias = () => {
-    const categorias = Array.from(new Set(getInsumos().map(item => item.categoria).filter(Boolean))).sort();
-    const seleccionActual = filtroCategoria.value;
-    filtroCategoria.innerHTML = '<option value="">Todas</option>' + categorias.map(cat => `
-        <option value="${cat}"${cat === seleccionActual ? ' selected' : ''}>${cat}</option>
-    `).join('');
+    const selectedFilter = filtroCategoria.value;
+    filtroCategoria.replaceChildren(new Option("Todas", ""));
+    categorias.forEach(category => filtroCategoria.add(new Option(category.nombre, category.nombre)));
+    filtroCategoria.value = selectedFilter;
+    [[document.getElementById("categoria"), ""], [document.getElementById("editCategoria"), document.getElementById("editCategoria")?.value || ""]].forEach(([select, selected]) => {
+        if (!select) return;
+        select.replaceChildren(new Option("Selecciona una categoría", ""));
+        categorias.forEach(category => select.add(new Option(category.nombre, String(category.id))));
+        select.value = selected;
+    });
 };
 
 const exportToPDF = () => {
@@ -399,10 +413,11 @@ window.addEventListener("click", (e) => {
     }
 });
 
-formInsumo?.addEventListener("submit", (e) => {
+formInsumo?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const nombre = document.getElementById("nombre").value.trim();
-    const categoria = document.getElementById("categoria").value.trim();
+    const categoryId = Number(document.getElementById("categoria").value);
+    const categoria = categorias.find(item => Number(item.id) === categoryId)?.nombre || "";
     const proveedor = proveedorSelect.value;
     const cantidad = Number(document.getElementById("cantidad").value);
     const unidad = document.getElementById("unidad").value.trim();
@@ -429,34 +444,41 @@ formInsumo?.addEventListener("submit", (e) => {
         return;
     }
 
-    const insumos = getInsumos();
-
     if (insumos.some(item => item.nombre.toLowerCase() === nombre.toLowerCase() && item.categoria.toLowerCase() === categoria.toLowerCase())) {
         Swal.fire({ icon: 'error', title: 'Insumo duplicado', text: 'Ya existe un insumo con el mismo nombre y categoría.', confirmButtonColor: '#27B7F5' });
         return;
     }
 
-    insumos.push({ nombre, categoria, proveedor, cantidad, unidad, precioUnitario, estado });
-    window.MarquezaAudit?.recordChange("create", STORAGE_KEY, insumos[insumos.length - 1]);
-    saveInsumos(insumos);
-    actualizarCategorias();
-    renderTabla();
-    cerrarModal();
-    Swal.fire('¡Guardado!', 'El insumo ha sido agregado correctamente.', 'success');
+    const session = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+    const userId = session?.id || usuarios[0]?.id;
+    if (!categoryId || !userId) {
+        Swal.fire({ icon: "warning", title: "Faltan relaciones", text: "Selecciona una categoría y registra un usuario antes de crear insumos." });
+        return;
+    }
+    const codigo = `INS-${crypto.randomUUID()}`;
+    try {
+        await window.MarquezaApi.post("/insumos/", { codigo, nombre, cantidad, precio: Math.round(precioUnitario), estado, usuario_id: userId, proveedor_id: Number(proveedor), etc_id: categoryId, unidad });
+        window.MarquezaAudit?.recordChange("create", STORAGE_KEY, { nombre, categoria, proveedor, cantidad, unidad, precioUnitario, estado });
+        await cargarDatos();
+        cerrarModal();
+        Swal.fire('¡Guardado!', 'El insumo se agregó a la base de datos.', 'success');
+    } catch (error) {
+        Swal.fire({ icon: "error", title: "No se pudo guardar", text: error.message });
+    }
 });
 
-formEditarInsumo?.addEventListener("submit", (e) => {
+formEditarInsumo?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const index = Number(document.getElementById("editIndex").value);
     const nombre = document.getElementById("editNombre").value.trim();
-    const categoria = document.getElementById("editCategoria").value.trim();
+    const categoryId = Number(document.getElementById("editCategoria").value);
+    const categoria = categorias.find(item => Number(item.id) === categoryId)?.nombre || "";
     const proveedor = editProveedorSelect.value;
     const cantidad = Number(document.getElementById("editCantidad").value);
     const unidad = document.getElementById("editUnidad").value.trim();
     const precioUnitario = Number(document.getElementById("editPrecioUnitario").value);
     const estado = document.getElementById("editEstado").value;
 
-    const insumos = getInsumos();
     const actual = insumos[index];
 
     if (!actual) return;
@@ -471,13 +493,16 @@ formEditarInsumo?.addEventListener("submit", (e) => {
         return;
     }
 
-    insumos[index] = { nombre, categoria, proveedor, cantidad, unidad, precioUnitario, estado };
-    window.MarquezaAudit?.recordChange("update", STORAGE_KEY, insumos[index]);
-    saveInsumos(insumos);
-    actualizarCategorias();
-    renderTabla();
-    cerrarEditModal();
-    Swal.fire('¡Actualizado!', 'Los datos del insumo se han guardado.', 'success');
+    const userId = actual.usuarioId || usuarios[0]?.id;
+    try {
+        await window.MarquezaApi.put(`/insumos/${actual.id}`, { codigo: actual.codigo, nombre, cantidad, precio: Math.round(precioUnitario), estado, usuario_id: userId, proveedor_id: Number(proveedor), etc_id: categoryId, unidad });
+        window.MarquezaAudit?.recordChange("update", STORAGE_KEY, { nombre, categoria, proveedor, cantidad, unidad, precioUnitario, estado });
+        await cargarDatos();
+        cerrarEditModal();
+        Swal.fire('¡Actualizado!', 'Los datos se guardaron en la base de datos.', 'success');
+    } catch (error) {
+        Swal.fire({ icon: "error", title: "No se pudo actualizar", text: error.message });
+    }
 });
 
 window.editarInsumo = (index) => {
@@ -487,8 +512,8 @@ window.editarInsumo = (index) => {
 
     document.getElementById("editIndex").value = index;
     document.getElementById("editNombre").value = insumo.nombre;
-    document.getElementById("editCategoria").value = insumo.categoria;
-    cargarProveedores(insumo.proveedor || "");
+    document.getElementById("editCategoria").value = insumo.categoriaId;
+    cargarProveedores(insumo.proveedorId || "");
     document.getElementById("editCantidad").value = insumo.cantidad;
     document.getElementById("editUnidad").value = insumo.unidad;
     document.getElementById("editPrecioUnitario").value = insumo.precioUnitario;
@@ -510,24 +535,14 @@ window.eliminarInsumo = (index) => {
         cancelButtonText: 'Cancelar'
     }).then((result) => {
         if (result.isConfirmed) {
-            const insumos = getInsumos();
-            const [insumo] = insumos.splice(index, 1);
-            window.MarquezaAudit?.recordChange("delete", STORAGE_KEY, insumo);
-            saveInsumos(insumos);
-            actualizarCategorias();
-            renderTabla();
-            Swal.fire('¡Eliminado!', 'El insumo ha sido removido.', 'success');
+            const insumo = getInsumos()[index];
+            window.MarquezaApi.delete(`/insumos/${insumo.id}`).then(async () => {
+                window.MarquezaAudit?.recordChange("delete", STORAGE_KEY, { nombre: insumo.nombre, codigo: insumo.codigo });
+                await cargarDatos();
+                Swal.fire('¡Eliminado!', 'El insumo se eliminó de la base de datos.', 'success');
+            }).catch(error => Swal.fire({ icon: "error", title: "No se pudo eliminar", text: error.message }));
         }
     });
 };
 
-cargarProveedores();
-actualizarCategorias();
-window.MarquezaRealtime?.subscribe(({ key }) => {
-    if (key === "marqueza_proveedores") cargarProveedores();
-    if (key === STORAGE_KEY) {
-        actualizarCategorias();
-        renderTabla(searchInput?.value || "");
-    }
-});
-renderTabla();
+cargarDatos();

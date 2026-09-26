@@ -1,6 +1,7 @@
 (function () {
     const STORAGE_KEY = "marqueza_bitacora";
     const MAX_EVENTS = 500;
+    let events = [];
 
     function getSession() {
         try {
@@ -12,18 +13,18 @@
     }
 
     function read() {
-        try {
-            const events = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-            return Array.isArray(events) ? events : [];
-        } catch {
-            return [];
-        }
+        return events;
+    }
+
+    async function load() {
+        events = await window.MarquezaApi.get("/auditoria/");
+        return events;
     }
 
     function log({ action, module = "Sistema", entity = "", detail = "", outcome = "success", actor, email, role }) {
         const session = getSession();
         const event = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            id: crypto.randomUUID(),
             timestamp: new Date().toISOString(),
             actor: actor || session?.nombre || "Sin identificar",
             email: email ?? session?.correo ?? "",
@@ -35,11 +36,10 @@
             outcome
         };
 
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify([event, ...read()].slice(0, MAX_EVENTS)));
-        } catch (error) {
-            console.error("No fue posible guardar el evento de auditoría.", error);
-        }
+        events = [event, ...events].slice(0, MAX_EVENTS);
+        window.MarquezaApi.post("/auditoria/", event).catch(error => {
+            console.error("No fue posible guardar el evento de auditoría en la API.", error);
+        });
         window.dispatchEvent(new CustomEvent("marqueza:audit", { detail: event }));
         return event;
     }
@@ -64,10 +64,10 @@
         if (!document.querySelector(".barra_lateral") || getSession()) return;
         const path = `${window.location.pathname}${window.location.search}`;
         log({ action: "Acceso denegado", module: "Acceso", entity: "Sesión requerida", detail: `Intento de acceso sin sesión a ${path}`, outcome: "denied" });
-        window.location.replace("../incio%20sesion/inicio%20sesion.html?motivo=sesion_requerida");
+        window.location.replace("../inicio_sesion/inicio_sesion.html?motivo=sesion_requerida");
     }
 
-    window.MarquezaAudit = { log, read, recordChange, guardPage };
+    window.MarquezaAudit = { log, read, load, recordChange, guardPage };
     window.addEventListener("error", (event) => {
         const page = window.location.pathname.split("/").filter(Boolean).at(-2) || "Aplicación";
         log({ action: "Error de aplicación", module: moduleLabel(page), detail: String(event.message || "Error JavaScript").slice(0, 300), outcome: "error" });

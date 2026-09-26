@@ -5,7 +5,7 @@
      • Hamburger + menú desplegable (tablet / móvil ≤ 1024 px): Controla la barra superior responsive.
      • Drag lateral (solo desktop): Permite arrastrar la barra lateral para colapsarla.
      • Modo oscuro / claro: Cambia el tema visual de la aplicación.
-     • Gestión de Usuarios: CRUD (Crear, Leer, Actualizar, Eliminar) usando LocalStorage.
+    • Gestión de Usuarios: CRUD (Crear, Leer, Actualizar, Eliminar) usando la API.
    ============================================================ */
 
 // --- Selección de elementos del DOM para la interfaz general ---
@@ -206,20 +206,23 @@ const formEditarUsuario = document.getElementById("formEditarUsuario");
 const btnCerrarEditModal = document.getElementById("cerrarEditModal");
 const btnCancelarEdit = document.getElementById("btnCancelarEdit");
 
-// Función para obtener usuarios de Local Storage
-const getUsuarios = () => {
-    const storedData = localStorage.getItem(STORAGE_KEY);
-    return storedData ? JSON.parse(storedData) : [
-        { nombre: 'Admin', correo: 'admin@example.com', rol: 'Administrador', contrasena: '1234' }
-    ];
-};
+let usuarios = [];
+let roles = [];
+const getUsuarios = () => usuarios;
 
-/**
- * Guarda el array de usuarios en el almacenamiento local del navegador.
- * @param {Array} usuarios - Lista de objetos de usuario.
- */
-const saveUsuarios = (usuarios) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(usuarios));
+const cargarUsuarios = async () => {
+    try {
+        const [rows, details] = await Promise.all([
+            window.MarquezaApi.get("/usuarios/"),
+            window.MarquezaApi.get("/detalles-etc/")
+        ]);
+        roles = details;
+        const roleNames = new Map(details.map(item => [Number(item.id), item.nombre]));
+        usuarios = rows.map(user => ({ ...user, rol: roleNames.get(Number(user.det_etc_id)) || "Sin rol" }));
+        renderTabla(searchInput?.value || "");
+    } catch (error) {
+        Swal.fire({ icon: "error", title: "No se pudieron cargar los usuarios", text: error.message });
+    }
 };
 
 /**
@@ -229,7 +232,7 @@ const saveUsuarios = (usuarios) => {
  */
 const renderTabla = (filtro = "") => {
     if (!tableBody) return;
-    // Mapeamos los usuarios para conservar su índice original del localStorage
+    // Conservamos el índice de la respuesta para resolver el ID al operar.
     const registros = getUsuarios();
     let usuarios = registros.map((u, i) => ({ ...u, originalIndex: i }));
 
@@ -267,8 +270,8 @@ const updateSummary = (registros, visibles) => {
         const element = document.getElementById(id);
         if (element) element.textContent = value;
     };
-    const administradores = registros.filter(usuario => usuario.rol === "Administrador").length;
-    const empleados = registros.filter(usuario => usuario.rol === "Empleado").length;
+    const administradores = registros.filter(usuario => String(usuario.rol).toLowerCase().includes("admin")).length;
+    const empleados = registros.length - administradores;
     const correos = registros.filter(usuario => String(usuario.correo || "").trim()).length;
     setText("totalUsuarios", registros.length);
     setText("administradoresUsuarios", administradores);
@@ -324,7 +327,7 @@ window.addEventListener("click", (e) => {
 });
 
 // --- Lógica de Guardado (Nuevo Usuario) ---
-formUsuario?.addEventListener("submit", (e) => {
+formUsuario?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const nombre = document.getElementById("nombre").value.trim();
     const correo = document.getElementById("correo").value.trim();
@@ -343,6 +346,10 @@ formUsuario?.addEventListener("submit", (e) => {
                 container: 'swal-above-modal' // Clase personalizada para asegurar que esté encima
             }
         });
+        return;
+    }
+    if (contrasena.length > 45) {
+        Swal.fire({ icon: "warning", title: "Contraseña muy larga", text: "La base de datos actual admite hasta 45 caracteres." });
         return;
     }
 
@@ -376,16 +383,24 @@ formUsuario?.addEventListener("submit", (e) => {
         return;
     }
 
-    usuarios.push({ nombre, correo, rol, contrasena });
-    window.MarquezaAudit?.recordChange("create", STORAGE_KEY, usuarios[usuarios.length - 1]);
-    saveUsuarios(usuarios);
-    renderTabla(searchInput.value);
-    cerrarModal();
-    Swal.fire('¡Guardado!', 'El usuario ha sido creado con éxito.', 'success');
+    const role = roles.find(item => String(item.nombre).toLowerCase() === rol.toLowerCase());
+    if (!role) {
+        Swal.fire({ icon: "error", title: "Rol no disponible", text: "Selecciona un rol configurado en la base de datos." });
+        return;
+    }
+    try {
+        await window.MarquezaApi.post("/usuarios/", { nombre, correo, contrasena, estado: "Activo", det_etc_id: role.id });
+        window.MarquezaAudit?.recordChange("create", STORAGE_KEY, { nombre, correo, rol });
+        await cargarUsuarios();
+        cerrarModal();
+        Swal.fire('¡Guardado!', 'El usuario se creó en la base de datos.', 'success');
+    } catch (error) {
+        Swal.fire({ icon: "error", title: "No se pudo guardar", text: error.message });
+    }
 });
 
 // --- Lógica de Actualización (Editar Usuario) ---
-formEditarUsuario?.addEventListener("submit", (e) => {
+formEditarUsuario?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const index = document.getElementById("editIndex").value;
     const nombre = document.getElementById("editNombre").value.trim();
@@ -425,18 +440,26 @@ formEditarUsuario?.addEventListener("submit", (e) => {
 
     const usuarioActual = usuarios[index];
 
-    usuarios[index] = {
-        nombre,
-        correo,
-        rol,
-        contrasena: nuevaPass || usuarioActual.contrasena
-    };
-
-    window.MarquezaAudit?.recordChange("update", STORAGE_KEY, usuarios[index]);
-    saveUsuarios(usuarios);
-    renderTabla(searchInput.value);
-    cerrarEditModal();
-    Swal.fire('¡Actualizado!', 'Los cambios se han guardado correctamente.', 'success');
+    const role = roles.find(item => String(item.nombre).toLowerCase() === rol.toLowerCase());
+    if (!role) {
+        Swal.fire({ icon: "error", title: "Rol no disponible", text: "Selecciona un rol configurado en la base de datos." });
+        return;
+    }
+    if (nuevaPass && nuevaPass.length > 45) {
+        Swal.fire({ icon: "warning", title: "Contraseña muy larga", text: "La base de datos actual admite hasta 45 caracteres." });
+        return;
+    }
+    const payload = { nombre, correo, estado: usuarioActual.estado || "Activo", det_etc_id: role.id };
+    if (nuevaPass) payload.contrasena = nuevaPass;
+    try {
+        await window.MarquezaApi.put(`/usuarios/${usuarioActual.id}`, payload);
+        window.MarquezaAudit?.recordChange("update", STORAGE_KEY, { nombre, correo, rol });
+        await cargarUsuarios();
+        cerrarEditModal();
+        Swal.fire('¡Actualizado!', 'Los cambios se guardaron en la base de datos.', 'success');
+    } catch (error) {
+        Swal.fire({ icon: "error", title: "No se pudo actualizar", text: error.message });
+    }
 });
 
 // Función global para editar usuarios
@@ -469,15 +492,17 @@ window.eliminarUsuario = (index) => {
         cancelButtonText: 'Cancelar'
     }).then((result) => {
         if (result.isConfirmed) {
-            const usuarios = getUsuarios();
-            const [usuario] = usuarios.splice(index, 1);
-            window.MarquezaAudit?.recordChange("delete", STORAGE_KEY, usuario);
-            saveUsuarios(usuarios);
-            renderTabla(searchInput.value);
-            Swal.fire('¡Eliminado!', 'El usuario ha sido removido.', 'success');
+            const usuario = getUsuarios()[index];
+            window.MarquezaApi.delete(`/usuarios/${usuario.id}`).then(async () => {
+                window.MarquezaAudit?.recordChange("delete", STORAGE_KEY, { nombre: usuario.nombre, correo: usuario.correo });
+                await cargarUsuarios();
+                Swal.fire('¡Eliminado!', 'El usuario se eliminó de la base de datos.', 'success');
+            }).catch(error => Swal.fire({ icon: "error", title: "No se pudo eliminar", text: error.message }));
         }
     });
 };
+
+cargarUsuarios();
 
 // Inicializar la tabla al cargar el script
 renderTabla();

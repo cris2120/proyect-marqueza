@@ -32,28 +32,32 @@ const btnCancelar = document.getElementById("btnCancelar");
 
 const STORAGE_KEY = "marqueza_productos";
 let editIndex = -1;
+let productos = [];
+let categorias = [];
+let usuarios = [];
 
-const getProductos = () => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-        try {
-            const parsed = JSON.parse(stored);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (error) {
-            console.error("No se pudo leer los productos:", error);
-        }
+const getProductos = () => productos;
+
+const cargarProductos = async () => {
+    try {
+        const [rows, details, users] = await Promise.all([
+            window.MarquezaApi.get("/productos/"),
+            window.MarquezaApi.get("/detalles-etc/"),
+            window.MarquezaApi.get("/usuarios/")
+        ]);
+        categorias = details;
+        usuarios = users;
+        const categoryNames = new Map(details.map(item => [Number(item.id), item.nombre]));
+        productos = rows.map(item => ({
+            ...item,
+            categoriaId: String(item.det_etc_id),
+            categoria: categoryNames.get(Number(item.det_etc_id)) || "Sin categoría"
+        }));
+        actualizarCategorias();
+        renderTabla();
+    } catch (error) {
+        window.Swal?.fire({ icon: "error", title: "No se pudo cargar productos", text: error.message });
     }
-
-    const iniciales = [
-        { codigo: "P001", nombre: "Camiseta básica", cantidad: 20, precio: 35000, estado: "Activo", categoria: "Camisetas" },
-        { codigo: "P002", nombre: "Pantalón jean", cantidad: 8, precio: 85000, estado: "Activo", categoria: "Pantalones" }
-    ];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(iniciales));
-    return iniciales;
-};
-
-const saveProductos = (productos) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(productos));
 };
 
 const formatNumber = (value) =>
@@ -112,7 +116,7 @@ const getFilteredProductos = () => {
             ].join(" ").toLowerCase();
 
             const coincideBusqueda = !query || texto.includes(query);
-            const coincideCategoria = !categoria || item.categoria === categoria;
+            const coincideCategoria = !categoria || item.categoriaId === categoria;
             const coincideEstado =
                 estadoSeleccionado === "Todos" ||
                 estadoVisual.toLowerCase() === estadoSeleccionado.toLowerCase();
@@ -123,17 +127,18 @@ const getFilteredProductos = () => {
 
 const actualizarCategorias = () => {
     if (!filtroCategoria) return;
-
-    const categorias = [...new Set(
-        getProductos().map(item => item.categoria).filter(Boolean)
-    )].sort((a, b) => a.localeCompare(b));
-
-    const actual = filtroCategoria.value;
-    filtroCategoria.innerHTML =
-        '<option value="">Todas</option>' +
-        categorias.map(categoria =>
-            `<option value="${categoria}" ${categoria === actual ? "selected" : ""}>${categoria}</option>`
-        ).join("");
+    const currentFilter = filtroCategoria.value;
+    const categorySelect = document.getElementById("categoria");
+    const currentCategory = categorySelect?.value || "";
+    const options = [...categorias].sort((a, b) => a.nombre.localeCompare(b.nombre));
+    filtroCategoria.replaceChildren(new Option("Todas", ""));
+    options.forEach(category => filtroCategoria.add(new Option(category.nombre, String(category.id))));
+    filtroCategoria.value = currentFilter;
+    if (categorySelect) {
+        categorySelect.replaceChildren(new Option("Selecciona una categoría", ""));
+        options.forEach(category => categorySelect.add(new Option(category.nombre, String(category.id))));
+        categorySelect.value = currentCategory;
+    }
 };
 
 const renderTabla = () => {
@@ -197,6 +202,7 @@ const abrirModal = (index = -1) => {
         document.getElementById("cantidad").value = producto.cantidad ?? "";
         document.getElementById("precio").value = producto.precio ?? "";
         document.getElementById("estado").value = producto.estado || "";
+        document.getElementById("categoria").value = producto.categoriaId || "";
     } else {
         if (titulo) titulo.textContent = "Agregar Producto";
     }
@@ -267,7 +273,7 @@ const exportToPDF = () => {
     window.Swal?.fire({ icon: "success", title: "Exportación lista", text: "El listado de productos se descargó correctamente.", timer: 1600, showConfirmButton: false });
 };
 
-form?.addEventListener("submit", event => {
+form?.addEventListener("submit", async event => {
     event.preventDefault();
 
     const codigo = document.getElementById("codigo").value.trim();
@@ -275,37 +281,41 @@ form?.addEventListener("submit", event => {
     const cantidad = Number(document.getElementById("cantidad").value);
     const precio = Number(document.getElementById("precio").value);
     const estado = document.getElementById("estado").value.trim();
+    const detEtcId = Number(document.getElementById("categoria").value);
 
     if (!codigo || !nombre || !Number.isFinite(cantidad) || cantidad < 0 ||
-        !Number.isFinite(precio) || precio < 0 || !estado) {
+        !Number.isFinite(precio) || precio < 0 || !estado || !detEtcId) {
         window.Swal?.fire({ icon: "warning", title: "Datos incompletos", text: "Completa todos los campos con valores válidos." });
         return;
     }
 
-    const productos = getProductos();
     const producto = {
         codigo,
         nombre,
         cantidad,
         precio,
         estado,
-        categoria: "General"
+        det_etc_id: detEtcId
     };
 
     const editing = editIndex >= 0;
-    if (editing) {
-        producto.categoria = productos[editIndex]?.categoria || "General";
-        productos[editIndex] = producto;
-    } else {
-        productos.push(producto);
+    const existing = editing ? getProductos()[editIndex] : null;
+    const usuarioId = existing?.usua_id || usuarios[0]?.id;
+    if (!usuarioId) {
+        window.Swal?.fire({ icon: "warning", title: "Falta un usuario", text: "Registra primero un usuario para asociarlo al producto." });
+        return;
     }
-
-    window.MarquezaAudit?.recordChange(editing ? "update" : "create", STORAGE_KEY, producto);
-    saveProductos(productos);
-    actualizarCategorias();
-    renderTabla();
-    cerrarModal();
-    window.Swal?.fire({ icon: "success", title: editing ? "Producto actualizado" : "Producto guardado", text: "La información se guardó correctamente.", timer: 1600, showConfirmButton: false });
+    producto.usuario_id = usuarioId;
+    try {
+        if (editing) await window.MarquezaApi.put(`/productos/${existing.id}`, producto);
+        else await window.MarquezaApi.post("/productos/", producto);
+        window.MarquezaAudit?.recordChange(editing ? "update" : "create", STORAGE_KEY, producto);
+        await cargarProductos();
+        cerrarModal();
+        window.Swal?.fire({ icon: "success", title: editing ? "Producto actualizado" : "Producto guardado", text: "La información se guardó en la base de datos.", timer: 1600, showConfirmButton: false });
+    } catch (error) {
+        window.Swal?.fire({ icon: "error", title: "No se pudo guardar", text: error.message });
+    }
 });
 
 tbody?.addEventListener("click", event => {
@@ -321,13 +331,15 @@ tbody?.addEventListener("click", event => {
     }
 
     if (button.classList.contains("btn-eliminar")) {
-        const removeProduct = () => {
-            const [producto] = productos.splice(index, 1);
-            window.MarquezaAudit?.recordChange("delete", STORAGE_KEY, producto);
-            saveProductos(productos);
-            actualizarCategorias();
-            renderTabla();
-            window.Swal?.fire({ icon: "success", title: "Producto eliminado", text: "El producto se eliminó correctamente.", timer: 1600, showConfirmButton: false });
+        const removeProduct = async () => {
+            try {
+                await window.MarquezaApi.delete(`/productos/${productos[index].id}`);
+                window.MarquezaAudit?.recordChange("delete", STORAGE_KEY, productos[index]);
+                await cargarProductos();
+                window.Swal?.fire({ icon: "success", title: "Producto eliminado", text: "El producto se eliminó correctamente.", timer: 1600, showConfirmButton: false });
+            } catch (error) {
+                window.Swal?.fire({ icon: "error", title: "No se pudo eliminar", text: error.message });
+            }
         };
         if (!window.Swal) return;
         window.Swal.fire({ icon: "warning", title: "¿Eliminar producto?", text: "Esta acción no se puede deshacer.", showCancelButton: true, confirmButtonText: "Eliminar", cancelButtonText: "Cancelar", confirmButtonColor: "#d4554d" }).then(result => { if (result.isConfirmed) removeProduct(); });
@@ -461,6 +473,8 @@ window.addEventListener("resize", () => {
         updateLayout();
     }, 100);
 });
+
+    cargarProductos();
 
 let isDragging = false;
 let dragStartX = 0;

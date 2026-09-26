@@ -9,16 +9,7 @@ class LoginForm {
         this.formulario.addEventListener("submit", (event) => this.submit(event));
     }
 
-    getUsers() {
-        try {
-            const users = JSON.parse(localStorage.getItem("marqueza_usuarios") || "[]");
-            return Array.isArray(users) ? users : [];
-        } catch {
-            return [];
-        }
-    }
-
-    submit(event) {
+    async submit(event) {
         event.preventDefault();
         const username = this.username?.value.trim() || "";
         const password = this.password?.value || "";
@@ -27,32 +18,23 @@ class LoginForm {
             return Swal.fire({ icon: "warning", title: "Campos incompletos", text: "Por favor completa todos los campos." });
         }
 
-        const users = this.getUsers();
-        if (!users.length) {
-            window.MarquezaAudit?.log({ action: "Usuario no registrado", module: "Acceso", entity: username, detail: "No hay usuarios registrados para validar el acceso.", outcome: "denied", actor: username, email: "", role: "Usuario" });
-            return Swal.fire({ icon: "info", title: "No hay usuarios registrados", text: "Registra un usuario desde el módulo Usuarios antes de iniciar sesión." });
-        }
-
-        const user = users.find(item => String(item.nombre || "").trim().toLowerCase() === username.toLowerCase());
-        if (!user) {
-            window.MarquezaAudit?.log({ action: "Usuario no registrado", module: "Acceso", entity: username, detail: "Intento de inicio de sesión con un usuario no registrado.", outcome: "denied", actor: username, email: "", role: "Usuario" });
-            return Swal.fire({ icon: "error", title: "Usuario no registrado", text: "El usuario no está registrado en el sistema." });
-        }
-
-        const valid = String(user.contrasena || "") === password;
-        if (valid) {
-            localStorage.setItem("marqueza_usuario_sesion", JSON.stringify({ nombre: user.nombre, correo: user.correo, rol: user.rol }));
+        const button = this.formulario.querySelector("button[type='submit']");
+        if (button) button.disabled = true;
+        try {
+            const result = await window.MarquezaApi.post("/auth/login", { usuario: username, contrasena: password });
+            const user = result.usuario;
+            const details = await window.MarquezaApi.get("/detalles-etc/");
+            const role = details.find(item => Number(item.id) === Number(user.det_etc_id))?.nombre || "Usuario";
+            localStorage.setItem("marqueza_usuario_sesion", JSON.stringify({ id: user.id, nombre: user.nombre, correo: user.correo, rol: role }));
             window.MarquezaAudit?.log({ action: "Inicio de sesión", module: "Acceso", detail: "Inicio de sesión autorizado." });
-        } else {
-            window.MarquezaAudit?.log({ action: "Inicio de sesión rechazado", module: "Acceso", entity: username, detail: "Contraseña incorrecta para usuario registrado.", outcome: "denied", actor: username });
+            await Swal.fire({ title: "Inicio de sesión exitoso", icon: "success", text: `Bienvenido ${user.nombre}` });
+            window.location.href = "../inicio/inicio.html";
+        } catch (error) {
+            window.MarquezaAudit?.log({ action: "Inicio de sesión rechazado", module: "Acceso", entity: username, detail: "La API rechazó las credenciales.", outcome: "denied", actor: username });
+            Swal.fire({ icon: "error", title: "No se pudo iniciar sesión", text: error.message });
+        } finally {
+            if (button) button.disabled = false;
         }
-        Swal.fire({
-            title: valid ? "Inicio de sesión exitoso" : "Error",
-            icon: valid ? "success" : "error",
-            text: valid ? `Bienvenido ${user.nombre}` : "El usuario o la contraseña son incorrectos."
-        }).then(() => {
-            if (valid) window.location.href = "../inicio/inicio.html";
-        });
     }
 }
 
