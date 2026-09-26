@@ -10,7 +10,7 @@ services:
   api:
     build:
       context: ..
-      dockerfile: base de datos orm sqlalchemy/Dockerfile.backend
+      dockerfile: base de datos orm/Dockerfile.backend
     restart: unless-stopped
     environment:
       MYSQL_HOST: ${MYSQL_HOST:?Define MYSQL_HOST en Dokploy}

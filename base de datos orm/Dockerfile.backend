@@ -7,7 +7,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential default-libmysqlclient-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-COPY ["base de datos orm sqlalchemy/requirements-backend.txt", "/tmp/requirements.txt"]
+COPY ["base de datos orm/requirements-backend.txt", "/tmp/requirements.txt"]
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 WORKDIR /app/backend/API
