@@ -26,6 +26,8 @@ Si la API esta en otro host o puerto, define `window.MARQUEZA_API_BASE_URL` ante
 
 ## Desplegar la API en Dokploy
 
+Consulta [backend/API/NGINX.md](backend/API/NGINX.md) para enrutar el dominio a la API con Dokploy o con un NGINX externo.
+
 1. Crea una aplicacion desde este repositorio y selecciona **Dockerfile** como tipo de build. Configura `backend/API` como contexto y `backend/API/Dockerfile` como ruta del Dockerfile.
 2. Expone el puerto `80` y asigna un dominio, por ejemplo `api.tudominio.com`. La imagen inicia Gunicorn y escucha en `0.0.0.0`.
 3. En las variables de entorno de Dokploy define `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD` y `MYSQL_DB` con los datos de una base MySQL accesible desde la aplicacion. `MYSQL_PORT` usa por defecto `3306`. Importa `database_marqueza.sql` en esa base antes de probar la API.
