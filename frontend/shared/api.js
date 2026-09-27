@@ -1,6 +1,6 @@
 class MarquezaApi {
     static get baseUrl() {
-        return (window.MARQUEZA_API_BASE_URL || "http://localhost:5000/api").replace(/\/+$/, "");
+        return (window.MARQUEZA_API_BASE_URL || "https://api-marqueza.zona52.lat/api").replace(/\/+$/, "");
     }
 
     static async request(path, options = {}) {
