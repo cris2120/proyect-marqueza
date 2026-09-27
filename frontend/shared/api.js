@@ -1,6 +1,7 @@
 class MarquezaApi {
     static get baseUrl() {
-        return (window.MARQUEZA_API_BASE_URL || "https://api-marqueza.zona52.lat/api").replace(/\/+$/, "");
+        const host = window.location.hostname || "localhost";
+        return (window.MARQUEZA_API_BASE_URL || `http://${host}:5000/api`).replace(/\/+$/, "");
     }
 
     static async request(path, options = {}) {
