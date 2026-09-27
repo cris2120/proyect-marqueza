@@ -8,9 +8,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MYSQL_USER=root \
     MYSQL_PASSWORD= \
     MYSQL_DB=marqueza_db
-    SMTP_PORT=587 \
-    SMTP_USE_SSL=false \
-    SMTP_TIMEOUT=15
 
 WORKDIR /app
 
