@@ -1,3 +1,4 @@
+import hmac
 import secrets
 import smtplib
 import ssl
@@ -76,6 +77,24 @@ def login():
     if not contrasena:
         return jsonify({"message": "Ingresa tu contrasena."}), 400
 
+    master_username = str(current_app.config.get("MARQUEZA_MASTER_ADMIN_USERNAME", "admin")).strip()
+    master_email = str(current_app.config.get("MARQUEZA_MASTER_ADMIN_EMAIL", "admin@marqueza.local")).strip().lower()
+    master_password = current_app.config.get("MARQUEZA_MASTER_ADMIN_PASSWORD")
+    is_master_login = identificador.casefold() in {master_username.casefold(), master_email.casefold()}
+    if is_master_login:
+        if not master_password:
+            return jsonify({"message": "Configura MARQUEZA_MASTER_ADMIN_PASSWORD en el entorno privado del backend."}), 503
+        if hmac.compare_digest(str(master_password), master_username):
+            return jsonify({"message": "La clave maestra debe ser distinta del nombre de usuario."}), 503
+        if not hmac.compare_digest(str(contrasena), str(master_password)):
+            return jsonify({"message": "Usuario o contrasena incorrectos."}), 401
+        try:
+            from Services.usuarios_services import provisionar_admin_maestro
+            provisionar_admin_maestro(str(master_password))
+        except Exception:
+            current_app.logger.exception("No fue posible aprovisionar la cuenta maestra.")
+            return jsonify({"message": "No se pudo preparar la cuenta maestra. Revisa la configuración del backend."}), 503
+
     usuarios = query(
         """SELECT u.USUA_ID, u.USUA_NOMBRE, u.USUA_CORREO, u.USUA_CONTRASENA,
                   u.USUA_ESTADO, u.USUA_DET_ETC_ID, d.DET_ETC_NOMBRE
@@ -89,6 +108,30 @@ def login():
         return jsonify({"message": "Usuario o contrasena incorrectos."}), 401
 
     usuario = usuarios[0]
+    is_master_record = str(usuario["USUA_NOMBRE"]).casefold() == master_username.casefold()
+    if is_master_record and not is_master_login:
+        if not master_password:
+            return jsonify({"message": "Configura MARQUEZA_MASTER_ADMIN_PASSWORD en el entorno privado del backend."}), 503
+        if not hmac.compare_digest(str(contrasena), str(master_password)):
+            return jsonify({"message": "Usuario o contrasena incorrectos."}), 401
+        try:
+            from Services.usuarios_services import provisionar_admin_maestro
+            provisionar_admin_maestro(str(master_password))
+            usuarios = query(
+                """SELECT u.USUA_ID, u.USUA_NOMBRE, u.USUA_CORREO, u.USUA_CONTRASENA,
+                          u.USUA_ESTADO, u.USUA_DET_ETC_ID, d.DET_ETC_NOMBRE
+                   FROM t_usuarios u
+                   JOIN t_detalles_etc d ON d.DET_ETC_ID = u.USUA_DET_ETC_ID
+                   WHERE u.USUA_CORREO = %s OR u.USUA_NOMBRE = %s
+                   LIMIT 1""",
+                     (master_email, master_username),
+            )
+            if not usuarios:
+                return jsonify({"message": "No se pudo recuperar la cuenta maestra."}), 503
+            usuario = usuarios[0]
+        except Exception:
+            current_app.logger.exception("No fue posible restaurar la cuenta maestra.")
+            return jsonify({"message": "No se pudo preparar la cuenta maestra. Revisa la configuración del backend."}), 503
     if usuario["USUA_ESTADO"] != "Activo":
         return jsonify({"message": "La cuenta esta desactivada."}), 403
     if not verify_password(usuario["USUA_CONTRASENA"], contrasena):
@@ -123,6 +166,9 @@ def forgot_password():
     email = str(data.get("correo", "")).strip().lower()
     if not email or "@" not in email:
         return jsonify({"message": "Ingresa un correo electrónico válido."}), 400
+    master_email = str(current_app.config.get("MARQUEZA_MASTER_ADMIN_EMAIL", "admin@marqueza.local")).strip().lower()
+    if email == master_email:
+        return jsonify({"message": "La contraseña de la cuenta maestra se administra en la configuración privada del servidor."}), 403
 
     token = secrets.token_urlsafe(32)
     _reset_tokens[token] = {"correo": email, "expires": datetime.now(timezone.utc) + timedelta(minutes=30)}
@@ -175,6 +221,9 @@ def reset_password():
         return jsonify({"message": "Token expirado."}), 400
 
     correo = token_data["correo"]
+    master_email = str(current_app.config.get("MARQUEZA_MASTER_ADMIN_EMAIL", "admin@marqueza.local")).strip().lower()
+    if str(correo).casefold() == master_email.casefold():
+        return jsonify({"message": "La contraseña de la cuenta maestra se administra en la configuración privada del servidor."}), 403
     c = current_app.mysql.connection.cursor()
     c.execute("SELECT USUA_ID FROM T_USUARIOS WHERE USUA_CORREO = %s", (correo,))
     user = c.fetchone()
