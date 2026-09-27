@@ -13,7 +13,7 @@ Esta es la opción recomendada al desplegar la API en Dokploy:
 
 ## Si NGINX es externo a Dokploy
 
-Configura el NGINX externo para reenviar el dominio al puerto publicado de la API. El siguiente ejemplo supone que el puerto `80` del contenedor se publica solo en `127.0.0.1:5000` del servidor:
+El archivo [`nginx.conf`](nginx.conf) contiene la configuracion lista para copiar al NGINX externo. Reenvia el dominio al puerto publicado de la API y supone que el puerto `80` del contenedor se publica solo en `127.0.0.1:5000` del servidor:
 
 ```nginx
 server {
