@@ -1,5 +1,0 @@
-Flask
-Flask-MySQLdb
-python-dotenv
-bcrypt
-gunicorn
