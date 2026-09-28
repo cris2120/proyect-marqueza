@@ -18,20 +18,26 @@ class LoginForm {
         }
     }
 
+    showAlert(options) {
+        if (window.Swal?.fire) return window.Swal.fire(options);
+        window.alert(`${options.title}\n\n${options.text}`);
+        return Promise.resolve();
+    }
+
     submit(event) {
         event.preventDefault();
         const username = this.username?.value.trim() || "";
         const password = this.password?.value || "";
 
         if (!username || !password) {
-            return Swal.fire({ icon: "warning", title: "Campos incompletos", text: "Por favor completa todos los campos." });
+            return this.showAlert({ icon: "warning", title: "Campos incompletos", text: "Por favor completa todos los campos." });
         }
 
         const isAdmin = username.toLowerCase() === "admin" && password === "admin1234";
         const users = this.getUsers();
         if (!isAdmin && !users.length) {
             window.MarquezaAudit?.log({ action: "Usuario no registrado", module: "Acceso", entity: username, detail: "No hay usuarios registrados para validar el acceso.", outcome: "denied", actor: username, email: "", role: "Usuario" });
-            return Swal.fire({ icon: "info", title: "No hay usuarios registrados", text: "Registra un usuario desde el módulo Usuarios antes de iniciar sesión." });
+            return this.showAlert({ icon: "info", title: "No hay usuarios registrados", text: "Registra un usuario desde el módulo Usuarios antes de iniciar sesión." });
         }
 
         const user = isAdmin
@@ -39,7 +45,7 @@ class LoginForm {
             : users.find(item => String(item.nombre || "").trim().toLowerCase() === username.toLowerCase());
         if (!user) {
             window.MarquezaAudit?.log({ action: "Usuario no registrado", module: "Acceso", entity: username, detail: "Intento de inicio de sesión con un usuario no registrado.", outcome: "denied", actor: username, email: "", role: "Usuario" });
-            return Swal.fire({ icon: "error", title: "Usuario no registrado", text: "El usuario no está registrado en el sistema." });
+            return this.showAlert({ icon: "error", title: "Usuario no registrado", text: "El usuario no está registrado en el sistema." });
         }
 
         const valid = isAdmin || String(user.contrasena || "") === password;
@@ -49,7 +55,7 @@ class LoginForm {
         } else {
             window.MarquezaAudit?.log({ action: "Inicio de sesión rechazado", module: "Acceso", entity: username, detail: "Contraseña incorrecta para usuario registrado.", outcome: "denied", actor: username });
         }
-        Swal.fire({
+        this.showAlert({
             title: valid ? "Inicio de sesión exitoso" : "Error",
             icon: valid ? "success" : "error",
             text: valid ? `Bienvenido ${user.nombre}` : "El usuario o la contraseña son incorrectos."
