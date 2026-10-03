@@ -109,6 +109,21 @@
         return "Puedo responder sobre el proyecto, esta pantalla y los conteos guardados localmente. No tengo un servicio de IA conectado ni acceso a información fuera de la aplicación. Prueba preguntando, por ejemplo: ¿Qué hace esta página? o ¿Cuántos clientes hay?";
     }
 
+    function chatEndpoint() {
+        if (window.MARQUEZA_API_BASE_URL) {
+            return `${window.MARQUEZA_API_BASE_URL.replace(/\/+$/, "")}/chat/`;
+        }
+        const hostname = window.location.hostname;
+        const isDevTunnel = hostname.endsWith(".devtunnels.ms");
+        const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+        const apiOrigin = isDevTunnel
+            ? `${window.location.protocol}//${hostname.replace(/-(5500|5000)(?=\.)/, "-5000")}`
+            : isLocal
+                ? `${window.location.protocol}//${hostname}:5000`
+                : window.location.origin;
+        return `${apiOrigin}/api/chat/`;
+    }
+
     function suggestedQuestions(module) {
         if (module.name === "Inicio") {
             return [module.countQuestion, "¿Cómo se guardan los datos?", "¿Qué muestra esta pantalla?"];
@@ -163,6 +178,7 @@
     const intro = createElement("div", "marqueza-assistant-intro");
     intro.append(createElement("p", "", "Hola, soy tu asistente contextual."));
     intro.append(createElement("p", "", "Pregunta por los módulos, los datos o cómo realizar una tarea."));
+    intro.append(createElement("p", "", "Tus mensajes se envían a OpenAI. No incluyas datos personales ni contraseñas."));
     const suggestions = createElement("div", "marqueza-assistant-suggestions");
     suggestedQuestions(currentModule()).forEach((suggestion) => {
         const button = createElement("button", "marqueza-assistant-suggestion", suggestion);
@@ -177,6 +193,7 @@
     const input = createElement("input", "marqueza-assistant-input");
     input.type = "text";
     input.name = "question";
+    input.maxLength = 2000;
     input.placeholder = "Escribe tu pregunta...";
     input.autocomplete = "off";
     input.setAttribute("aria-label", "Escribe tu pregunta");
@@ -195,13 +212,46 @@
         messages.scrollTop = messages.scrollHeight;
     }
 
-    function submitQuestion(question) {
+    const conversation = [];
+
+    async function submitQuestion(question) {
         const value = question.trim();
-        if (!value) return;
+        if (!value || sendButton.disabled) return;
         addMessage(value, "user");
         input.value = "";
-        addMessage(answerQuestion(value), "assistant");
-        input.focus();
+        input.disabled = true;
+        sendButton.disabled = true;
+        const typing = createElement("p", "marqueza-assistant-message is-assistant", "Escribiendo...");
+        typing.setAttribute("role", "status");
+        messages.appendChild(typing);
+        messages.scrollTop = messages.scrollHeight;
+
+        const nextConversation = [...conversation, { role: "user", content: value }].slice(-12);
+        try {
+            const response = await fetch(chatEndpoint(), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: nextConversation })
+            });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok) {
+                throw new Error(payload?.message || `Error HTTP ${response.status}`);
+            }
+            if (typeof payload?.reply !== "string" || !payload.reply.trim()) {
+                throw new Error("El servidor no devolvio una respuesta valida.");
+            }
+            conversation.splice(0, conversation.length, ...nextConversation, { role: "assistant", content: payload.reply });
+            addMessage(payload.reply, "assistant");
+        } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error);
+            conversation.length = 0;
+            addMessage(`No pude usar la IA (${reason}). Respuesta local: ${answerQuestion(value)}`, "assistant");
+        } finally {
+            typing.remove();
+            input.disabled = false;
+            sendButton.disabled = false;
+            input.focus();
+        }
     }
 
     function setOpen(isOpen) {
