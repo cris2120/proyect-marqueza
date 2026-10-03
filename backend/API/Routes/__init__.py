@@ -16,7 +16,6 @@ from .auth_bp import auth_bp
 from .detalle_cotizacion_bp import detalle_cotizacion_bp
 from .recuperacion_contrasena_bp import recuperacion_contrasena_bp
 from .bitacora_auditoria_bp import bitacora_auditoria_bp
-from .chat_bp import chat_bp
 
 
 PREFIX = '/api'
@@ -42,4 +41,3 @@ def load_routes(app):
     app.register_blueprint(detalle_cotizacion_bp, url_prefix=f'{PREFIX}/detalle-cotizacion')
     app.register_blueprint(recuperacion_contrasena_bp, url_prefix=f'{PREFIX}/recuperacion-contrasena')
     app.register_blueprint(bitacora_auditoria_bp, url_prefix=f'{PREFIX}/bitacora-auditoria')
-    app.register_blueprint(chat_bp, url_prefix=f'{PREFIX}/chat')
