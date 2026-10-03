@@ -19,6 +19,9 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_TIMEOUT: ${SMTP_TIMEOUT:-15}
       FRONTEND_RESET_URL: ${FRONTEND_RESET_URL:-http://localhost:5000/frontend/olvido_contrasena/restablecer.html}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_TIMEOUT: ${OPENAI_TIMEOUT:-30}
     depends_on:
       db:
         condition: service_healthy
