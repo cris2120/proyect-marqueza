@@ -21,3 +21,6 @@ class Config:
         "FRONTEND_RESET_URL",
         "http://localhost:5000/frontend/olvido_contrasena/restablecer.html",
     )
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", "30"))
