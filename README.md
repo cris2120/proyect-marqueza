@@ -48,9 +48,3 @@ Para enviar correos de recuperación con Gmail, activa la verificación en dos p
 La plantilla usa Gmail por STARTTLS (`SMTP_PORT=587`, `SMTP_USE_SSL=false`). Para un proveedor con SSL implícito en el puerto 465, cambia `SMTP_PORT=465` y `SMTP_USE_SSL=true`. `FRONTEND_RESET_URL` debe apuntar a `frontend/olvido_contrasena/restablecer.html` y ser accesible desde el dispositivo que recibirá el mensaje.
 
 El correo contiene un enlace de un solo uso para establecer una contraseña nueva; nunca envía la contraseña actual en texto claro.
-
-## Chatbot con OpenAI
-
-El asistente flotante usa `POST /api/chat` en Flask y OpenAI Chat Completions. Para activarlo en desarrollo, define `OPENAI_API_KEY` en `backend/API/.env` (puedes copiar el nombre de la variable desde `backend/API/.env.example`) y reinicia el backend. Opcionalmente, configura `OPENAI_MODEL` y `OPENAI_TIMEOUT`. La clave permanece en el servidor; no la agregues al frontend ni la subas a Git.
-
-En Dokploy, agrega `OPENAI_API_KEY` como variable secreta de la aplicacion y vuelve a desplegar; Compose la pasa al backend. Sin una clave configurada, el chat muestra un aviso y conserva respuestas locales para las preguntas que reconoce. El asistente no consulta datos reales de la base de datos, por lo que no puede informar cantidades o ventas actuales. Las preguntas se envian a OpenAI para generar respuestas; evita incluir datos personales o confidenciales.
