@@ -46,7 +46,7 @@ Si NGINX está en el mismo servidor que Dokploy, no uses este ejemplo sin cambia
 
 ## Swagger
 
-La interfaz Swagger esta disponible en `/api/docs` y carga la especificacion desde `/documentacion` (por ejemplo, `https://api-marqueza.zona52.lat/documentacion`). La URL de servidor OpenAPI es relativa (`/api`), por lo que **Try it out** usa el mismo dominio donde se abrio la documentacion, tanto en local como detras del proxy.
+La interfaz Swagger esta disponible en `/documentacion` (tambien `/api/docs`) y carga la especificacion desde `/api/swagger.json`. La URL de servidor OpenAPI es relativa (`/api`), por lo que **Try it out** usa el mismo dominio donde se abrio la documentacion, tanto en local como detras del proxy.
 
 ## Verificar
 

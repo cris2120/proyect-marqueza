@@ -76,6 +76,13 @@ def health():
 
 
 @app.route("/documentacion")
+def api_docs():
+    return send_from_directory(
+        os.path.join(os.path.dirname(__file__), "static", "swagger-ui"),
+        "index.html",
+    )
+
+
 @app.route("/api/swagger.json")
 def swagger_spec():
     return send_from_directory(
@@ -87,8 +94,8 @@ def swagger_spec():
 
 @app.route("/api/docs")
 @app.route("/api/docs/")
-def api_docs():
-    return redirect("/static/swagger-ui/index.html")
+def api_docs_alias():
+    return redirect("/documentacion")
 
 
 load_routes(app)
