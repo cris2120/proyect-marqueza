@@ -6,7 +6,7 @@
     "version": "1.0.0"
   },
   "servers": [
-    { "url": "http://localhost:5000/api" }
+    { "url": "/api" }
   ],
   "tags": [
     { "name": "Usuarios", "description": "Gestión de usuarios y autenticación" },
@@ -169,7 +169,7 @@
       "post": { "tags": ["Bitácora"], "summary": "Registrar evento" }
     },
     "/documentacion": {
-      "get": { "tags": ["Documentación"], "summary": "Swagger UI" }
+      "get": { "tags": ["Documentación"], "summary": "Listar documentación registrada" }
     }
   },
   "components": {

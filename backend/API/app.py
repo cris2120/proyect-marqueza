@@ -75,6 +75,22 @@ def health():
     return jsonify({"status": "ok", "database": database}), 200
 
 
+@app.route("/documentacion")
+@app.route("/api/swagger.json")
+def swagger_spec():
+    return send_from_directory(
+        os.path.dirname(__file__),
+        "swagger.json",
+        mimetype="application/json",
+    )
+
+
+@app.route("/api/docs")
+@app.route("/api/docs/")
+def api_docs():
+    return redirect("/static/swagger-ui/index.html")
+
+
 load_routes(app)
 
 with app.app_context():
