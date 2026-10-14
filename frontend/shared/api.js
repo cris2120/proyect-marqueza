@@ -9,7 +9,7 @@ class MarquezaApi {
             ? `${window.location.protocol}//${hostname.replace(/-(5500|5000)(?=\.)/, "-5000")}`
             : isLocal
                 ? `${window.location.protocol}//${hostname}:5000`
-                : window.location.origin;
+                : "https://api-marqueza.zona52.lat";
         const localApiUrl = `${apiHost}/api`;
         return (window.MARQUEZA_API_BASE_URL || localApiUrl).replace(/\/+$/, "");
     }
