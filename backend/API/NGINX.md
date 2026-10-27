@@ -46,7 +46,7 @@ Si NGINX está en el mismo servidor que Dokploy, no uses este ejemplo sin cambia
 
 ## Swagger
 
-La interfaz Swagger esta disponible en `/documentacion` (tambien `/api/docs`) y carga la especificacion desde `/api/swagger.json`. En Dokploy, la raiz del dominio configurado como `API_DOCS_HOST` tambien abre Swagger; el valor predeterminado es `api-marqueza.zona52.lat`. Los botones **Try it out** apuntan a `https://api-marqueza.zona52.lat/api`. Para otro dominio de API, actualiza el servidor definido en `swagger.json`.
+La interfaz Swagger esta disponible en `/documentacion` (tambien `/api/docs`) y carga la especificacion desde `/api/swagger.json`. En Dokploy, la raiz del dominio configurado como `API_DOCS_HOST` tambien abre Swagger; el valor predeterminado es `api-marqueza.zona52.lat`. Los botones **Try it out** usan la ruta relativa `/api` en el mismo dominio donde se abre Swagger. Si la API se aloja en otro origen, actualiza el servidor definido en `swagger.json`.
 
 ## Verificar
 
