@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../shared/estilos-base.css">
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="estilo.css">
     <title>Iniciar sesión | MARQUEZA</title>
 </head>
@@ -44,7 +45,13 @@
             <!-- contenedor de contraseña -->
             <div class="campo-login">
                 <label for="contraseña">Contraseña</label>
-                <div class="input-shell"><i class="bx bx-lock-alt" aria-hidden="true"></i><input type="password" placeholder="Ingresa tu contraseña" class="caja_inicio" required autocomplete="current-password" id="contraseña"></div>
+                <div class="input-shell">
+                    <i class="bx bx-lock-alt" aria-hidden="true"></i>
+                    <input type="password" placeholder="Ingresa tu contraseña" class="caja_inicio" required autocomplete="current-password" id="contraseña">
+                    <button type="button" class="password-toggle" id="toggle-contrasena" aria-label="Mostrar contraseña" aria-pressed="false">
+                        <i class="bx bx-show" aria-hidden="true"></i>
+                    </button>
+                </div>
             </div>
             
             <!-- recordar y olvidaste tu contraseña -->

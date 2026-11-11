@@ -3,10 +3,20 @@ class LoginForm {
         this.formulario = formulario;
         this.username = formulario.querySelector("#usuario");
         this.password = formulario.querySelector("#contraseña");
+        this.passwordToggle = formulario.querySelector("#toggle-contrasena");
     }
 
     init() {
         this.formulario.addEventListener("submit", (event) => this.submit(event));
+        this.passwordToggle?.addEventListener("click", () => this.togglePasswordVisibility());
+    }
+
+    togglePasswordVisibility() {
+        const isPasswordHidden = this.password.type === "password";
+        this.password.type = isPasswordHidden ? "text" : "password";
+        this.passwordToggle.setAttribute("aria-label", isPasswordHidden ? "Ocultar contraseña" : "Mostrar contraseña");
+        this.passwordToggle.setAttribute("aria-pressed", String(isPasswordHidden));
+        this.passwordToggle.querySelector("i").className = `bx ${isPasswordHidden ? "bx-hide" : "bx-show"}`;
     }
 
     async submit(event) {
@@ -32,13 +42,7 @@ class LoginForm {
             window.MarquezaAudit?.log({ action: "Inicio de sesión rechazado", module: "Acceso", entity: username, detail: error.message, outcome: "denied", actor: username });
             return window.MarquezaApi.notifyError(error, "No se pudo iniciar sesión");
         }
-        Swal.fire({
-            title: "Inicio de sesión exitoso",
-            icon: "success",
-            text: `Bienvenido ${user.nombre}`
-        }).then(() => {
-            window.location.href = "../inicio/inicio.html";
-        });
+        window.location.replace("../inicio/inicio.html");
     }
 }
 

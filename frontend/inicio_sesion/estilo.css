@@ -437,6 +437,10 @@ body:has(#formulario) .input-shell > i { margin-left: 14px; color: #718096; font
 body:has(#formulario) .input-shell input { flex: 1; width: auto; min-width: 0; margin: 0; padding: 12px 13px; border: 0; border-radius: 11px; outline: 0; background: transparent; color: #263746; font-size: 13px; }
 body:has(#formulario) .input-shell input:focus { border: 0; outline: 0; box-shadow: none; }
 body:has(#formulario) .input-shell input::placeholder { color: #9aa8b4; }
+body:has(#formulario) .input-shell .password-toggle { display: flex; align-items: center; justify-content: center; flex: 0 0 42px; width: 42px; height: 42px; margin-right: 4px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #718096; box-shadow: none; }
+body:has(#formulario) .input-shell .password-toggle:hover { transform: none; background: rgba(39, 183, 245, .1); color: #177e9e; }
+body:has(#formulario) .input-shell .password-toggle:focus-visible { outline: 2px solid #27b7f5; outline-offset: -2px; }
+body:has(#formulario) .input-shell .password-toggle i { margin: 0; font-size: 19px; }
 body:has(#formulario) .options { margin: 2px 0 25px; color: #718096; font-size: 12px; }
 body:has(#formulario) .options label { display: flex; align-items: center; gap: 7px; margin: 0; font-weight: 600; }
 body:has(#formulario) .options input { width: 15px; height: 15px; margin: 0; accent-color: #27b7f5; }
