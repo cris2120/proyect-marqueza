@@ -74,10 +74,22 @@
           }
         },
         "responses": {
-          "200": { "description": "Devuelve el usuario y el token Bearer firmado con su vigencia en segundos." },
+          "200": { "description": "Devuelve el usuario y un token Bearer único sin vencimiento." },
           "400": { "description": "Falta el usuario/correo o la contraseña" },
           "401": { "description": "Credenciales inválidas" },
           "403": { "description": "Cuenta desactivada" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Autenticación"],
+        "summary": "Revocar el token de la sesión actual",
+        "operationId": "logout",
+        "responses": {
+          "204": { "description": "Token revocado correctamente" },
+          "401": { "description": "Token inválido o ya revocado" },
+          "503": { "description": "No fue posible revocar el token" }
         }
       }
     },

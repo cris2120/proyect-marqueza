@@ -1,11 +1,18 @@
 import os
 
 from flask import Flask, g, jsonify, redirect, request, send_from_directory
+from MySQLdb import Error as MySQLError
 
 from config import Config
 from flask_mysqldb import MySQL
 from Routes import load_routes
-from Services.auth_tokens import InvalidAccessToken, TokenConfigurationError, verify_access_token
+from Services.auth_tokens import (
+    InvalidAccessToken,
+    TokenConfigurationError,
+    ensure_access_token_table,
+    is_access_token_active,
+    verify_access_token,
+)
 from Services.usuarios_services import ensure_admin_user
 
 app = Flask(__name__)
@@ -47,19 +54,34 @@ def require_api_token():
     if request.endpoint in public_endpoints:
         return None
 
+    if not app.config.get("API_TOKEN_TABLE_READY"):
+        try:
+            ensure_access_token_table()
+        except MySQLError:
+            app.logger.exception("No se pudo preparar la tabla de tokens de acceso.")
+            return jsonify({"message": "El servicio de autenticación no está disponible."}), 503
+
     authorization = request.headers.get("Authorization", "")
     scheme, separator, token = authorization.partition(" ")
     if not separator or scheme.lower() != "bearer" or not token.strip():
         return jsonify({"message": "Se requiere un token Bearer válido."}), 401
 
     try:
-        g.api_user = verify_access_token(token.strip(), app.config.get("API_TOKEN_SECRET"))
+        user_token = verify_access_token(token.strip(), app.config.get("API_TOKEN_SECRET"))
     except TokenConfigurationError as error:
         app.logger.error("La autenticación de la API no está configurada: %s", error)
         return jsonify({"message": str(error)}), 503
     except InvalidAccessToken:
         return jsonify({"message": "El token de acceso es inválido o expiró."}), 401
 
+    try:
+        if not is_access_token_active(user_token["jti"]):
+            return jsonify({"message": "El token de acceso fue revocado o la cuenta está desactivada."}), 401
+    except MySQLError:
+        app.logger.exception("No se pudo comprobar el estado del token de acceso.")
+        return jsonify({"message": "No se pudo validar el token de acceso."}), 503
+
+    g.api_user = user_token
     return None
 
 
@@ -138,6 +160,13 @@ def api_docs_alias():
 load_routes(app)
 
 with app.app_context():
+    try:
+        ensure_access_token_table()
+        app.config["API_TOKEN_TABLE_READY"] = True
+    except MySQLError:
+        app.logger.exception("No se pudo preparar la tabla de tokens de acceso.")
+        app.config["API_TOKEN_TABLE_READY"] = False
+
     try:
         ensure_admin_user()
     except Exception:

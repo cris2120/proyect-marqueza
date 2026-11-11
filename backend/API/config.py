@@ -22,4 +22,3 @@ class Config:
         "http://localhost:5000/frontend/olvido_contrasena/restablecer.html",
     )
     API_TOKEN_SECRET = os.getenv("MARQUEZA_TOKEN_SECRET")
-    API_TOKEN_TTL_SECONDS = int(os.getenv("API_TOKEN_TTL_SECONDS", "28800"))
