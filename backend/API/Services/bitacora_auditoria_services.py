@@ -43,8 +43,7 @@ class bitacora_auditoria_services:
     @staticmethod
     def servListBitacora(id=None):
         rows = query(
-            """SELECT DATE_FORMAT(AUD_FECHA_HORA, '%Y-%m-%dT%H:%i:%sZ') AS timestamp,
-                      AUD_UUID AS uuid,
+            """SELECT AUD_FECHA_HORA AS timestamp, AUD_UUID AS uuid,
                       AUD_ACTOR AS actor, AUD_CORREO AS email, AUD_ROL AS role,
                       AUD_ACCION AS action, AUD_MODULO AS module, AUD_ENTIDAD AS entity,
                       AUD_DETALLE AS detail, AUD_RESULTADO AS outcome, AUD_ID AS id
@@ -55,7 +54,16 @@ class bitacora_auditoria_services:
             .format(where="WHERE AUD_ID = %s" if id is not None else ""),
             (id,) if id is not None else (),
         )
-        return serialize_rows(rows)
+        serialized = serialize_rows(rows)
+        for row, source in zip(serialized, rows):
+            timestamp = source.get("timestamp")
+            if isinstance(timestamp, datetime):
+                row["timestamp"] = (
+                    timestamp.replace(tzinfo=timezone.utc)
+                    .isoformat(timespec="seconds")
+                    .replace("+00:00", "Z")
+                )
+        return serialized
 
     @staticmethod
     def addBitacoraAuditoria(data):
