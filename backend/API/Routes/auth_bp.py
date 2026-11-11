@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 from flask import Blueprint, jsonify, request, current_app
 
+from Services.auth_tokens import TokenConfigurationError, create_access_token
 from Services.helpers import hash_password, query, verify_password
 
 auth_bp = Blueprint("auth_bp", __name__)
@@ -95,17 +96,28 @@ def login():
     if not verify_password(usuario["USUA_CONTRASENA"], contrasena):
         return jsonify({"message": "Usuario o contrasena incorrectos."}), 401
 
+    try:
+        token = create_access_token(
+            usuario["USUA_ID"],
+            usuario["DET_ETC_NOMBRE"],
+            current_app.config.get("API_TOKEN_SECRET"),
+            current_app.config["API_TOKEN_TTL_SECONDS"],
+        )
+    except TokenConfigurationError as error:
+        current_app.logger.error("No se pudo emitir el token de acceso: %s", error)
+        return jsonify({"message": str(error)}), 503
+
     from Services.usuarios_services import marcar_ultimo_acceso
     try:
         marcar_ultimo_acceso(usuario["USUA_ID"])
     except Exception:
         pass
 
-    token = secrets.token_urlsafe(32)
-
     return jsonify({
         "message": "Inicio de sesion exitoso",
         "token": token,
+        "token_type": "Bearer",
+        "expires_in": current_app.config["API_TOKEN_TTL_SECONDS"],
         "usuario": {
             "id": usuario["USUA_ID"],
             "nombre": usuario["USUA_NOMBRE"],

@@ -5,6 +5,7 @@
     "description": "API REST para gestión integral de confecciones - Marqueza.",
     "version": "1.0.0"
   },
+  "security": [{ "BearerAuth": [] }],
   "servers": [
     {
       "url": "/api",
@@ -38,6 +39,7 @@
         "tags": ["Estado"],
         "summary": "Verificar API y conexión a la base de datos",
         "operationId": "getHealth",
+        "security": [],
         "responses": {
           "200": { "description": "Estado del servicio y conexión a base de datos" }
         }
@@ -48,6 +50,7 @@
         "tags": ["Autenticación"],
         "summary": "Iniciar sesión con usuario o correo",
         "operationId": "login",
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -71,7 +74,7 @@
           }
         },
         "responses": {
-          "200": { "description": "Inicio de sesión exitoso" },
+          "200": { "description": "Devuelve el usuario y el token Bearer firmado con su vigencia en segundos." },
           "400": { "description": "Falta el usuario/correo o la contraseña" },
           "401": { "description": "Credenciales inválidas" },
           "403": { "description": "Cuenta desactivada" }
@@ -83,6 +86,7 @@
         "tags": ["Autenticación"],
         "summary": "Solicitar recuperación de contraseña",
         "operationId": "forgotPassword",
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -110,6 +114,7 @@
         "tags": ["Autenticación"],
         "summary": "Restablecer contraseña con el token recibido por correo",
         "operationId": "resetPassword",
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -851,6 +856,13 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token Bearer devuelto por /auth/login."
+      }
+    },
     "parameters": {
       "IdPath": {
         "name": "id",

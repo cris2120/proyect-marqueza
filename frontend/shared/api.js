@@ -1,4 +1,5 @@
 const loginUrl = new URL("../inicio_sesion/inicio_sesion.html?motivo=servidor_desconectado", document.currentScript.src);
+const expiredSessionUrl = new URL("../inicio_sesion/inicio_sesion.html?motivo=sesion_requerida", document.currentScript.src);
 
 class MarquezaApi {
     static get baseUrl() {
@@ -15,12 +16,14 @@ class MarquezaApi {
     }
 
     static async request(path, options = {}) {
+        const sessionToken = this.sessionToken();
         let response;
         try {
             response = await fetch(`${this.baseUrl}${path}`, {
                 ...options,
                 headers: {
                     ...(options.body ? { "Content-Type": "application/json" } : {}),
+                    ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
                     ...options.headers
                 }
             });
@@ -51,9 +54,29 @@ class MarquezaApi {
             }
         }
         if (!response.ok) {
-            throw new Error(payload?.mensaje || payload?.message || `Error HTTP ${response.status}`);
+            const message = payload?.mensaje || payload?.message || `Error HTTP ${response.status}`;
+            if (response.status === 401 && sessionToken && !path.startsWith("/auth/")) {
+                localStorage.removeItem("marqueza_usuario_sesion");
+                sessionStorage.removeItem("marqueza_sesion_activa");
+                window.location.replace(expiredSessionUrl);
+            }
+            throw new Error(message);
         }
         return payload;
+    }
+
+    static sessionToken() {
+        const storedSession = localStorage.getItem("marqueza_usuario_sesion");
+        if (!storedSession) return null;
+
+        let session;
+        try {
+            session = JSON.parse(storedSession);
+        } catch (error) {
+            console.error("No fue posible leer la sesión almacenada.", error);
+            throw new Error("No fue posible leer la sesión almacenada. Cierra sesión y vuelve a ingresar.");
+        }
+        return typeof session?.token === "string" && session.token ? session.token : null;
     }
 
     static list(resource) {
