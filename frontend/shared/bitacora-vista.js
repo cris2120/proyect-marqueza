@@ -110,6 +110,11 @@
                     </table>
                 </div>
                 <p class="audit-empty" data-audit-empty hidden>No hay actividades para esta fecha.</p>
+                <nav class="audit-pagination" aria-label="Paginación del registro" data-audit-pagination hidden>
+                    <button type="button" data-audit-page-previous aria-label="Página anterior"><i class="bx bx-chevron-left"></i><span>Anterior</span></button>
+                    <span data-audit-page-label aria-live="polite"></span>
+                    <button type="button" data-audit-page-next aria-label="Página siguiente"><span>Siguiente</span><i class="bx bx-chevron-right"></i></button>
+                </nav>
             </section>
             <p class="audit-note" data-audit-status role="status"><i class="bx bx-info-circle" aria-hidden="true"></i><span>Cargando bitácora...</span></p>
         `;
@@ -124,6 +129,10 @@
             selection: root.querySelector("[data-audit-selection]"),
             rows: root.querySelector("[data-audit-rows]"),
             empty: root.querySelector("[data-audit-empty]"),
+            pagination: root.querySelector("[data-audit-pagination]"),
+            previousPage: root.querySelector("[data-audit-page-previous]"),
+            nextPage: root.querySelector("[data-audit-page-next]"),
+            pageLabel: root.querySelector("[data-audit-page-label]"),
             results: root.querySelector("[data-audit-results]"),
             search: root.querySelector("[data-audit-search]"),
             filter: root.querySelector("[data-audit-filter]"),
@@ -131,6 +140,8 @@
         };
 
         let events = window.MarquezaAudit.read().map(normalizeEvent);
+        let currentPage = 1;
+        const pageSize = 20;
         const today = new Date();
         let selectedDate = localDateKey(today);
         let month = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -209,7 +220,10 @@
         function renderRows(filtered) {
             elements.rows.replaceChildren();
             elements.empty.hidden = filtered.length > 0;
-            filtered.forEach((event) => {
+            const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+            currentPage = Math.min(currentPage, pageCount);
+            const start = (currentPage - 1) * pageSize;
+            filtered.slice(start, start + pageSize).forEach((event) => {
                 const row = document.createElement("tr");
                 const dateCell = document.createElement("td");
                 dateCell.className = "audit-date";
@@ -243,6 +257,10 @@
                 row.append(dateCell, actorCell, eventCell, moduleCell, detailCell);
                 elements.rows.appendChild(row);
             });
+            elements.pagination.hidden = filtered.length <= pageSize;
+            elements.previousPage.disabled = currentPage === 1;
+            elements.nextPage.disabled = currentPage === pageCount;
+            elements.pageLabel.textContent = `Página ${currentPage} de ${pageCount} · ${filtered.length} ${filtered.length === 1 ? "registro" : "registros"}`;
         }
 
         function render() {
@@ -253,6 +271,7 @@
                 elements.errors.textContent = String(events.filter(isError).length);
             }
             const filtered = dayEvents();
+            currentPage = Math.min(currentPage, Math.max(1, Math.ceil(filtered.length / pageSize)));
             const countLabel = loginOnly
                 ? (filtered.length === 1 ? "inicio de sesión" : "inicios de sesión")
                 : (filtered.length === 1 ? "actividad" : "actividades");
@@ -319,8 +338,22 @@
         root.querySelector("[data-audit-refresh]")?.addEventListener("click", refresh);
         root.querySelector("[data-audit-previous]")?.addEventListener("click", () => changeMonth(-1));
         root.querySelector("[data-audit-next]")?.addEventListener("click", () => changeMonth(1));
-        elements.search.addEventListener("input", render);
-        elements.filter?.addEventListener("change", render);
+        elements.search.addEventListener("input", () => {
+            currentPage = 1;
+            render();
+        });
+        elements.filter?.addEventListener("change", () => {
+            currentPage = 1;
+            render();
+        });
+        elements.previousPage.addEventListener("click", () => {
+            currentPage = Math.max(1, currentPage - 1);
+            render();
+        });
+        elements.nextPage.addEventListener("click", () => {
+            currentPage += 1;
+            render();
+        });
         root.querySelectorAll("[data-audit-export]").forEach((button) => {
             button.addEventListener("click", () => exportEvents(button.dataset.auditExport));
         });
