@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
 .sidebar-standard {
     position: fixed;
     top: 0;
@@ -13,6 +15,8 @@
     transition: all .5s ease;
 }
 
+.sidebar-standard,
+.sidebar-standard * { font-family: 'Poppins', sans-serif; }
 .sidebar-standard.close { width: 88px; }
 .sidebar-standard header { position: relative; margin-bottom: 0; color: #f7fcff; }
 .sidebar-standard .imagen_texto { display: flex; align-items: center; }
@@ -129,11 +133,15 @@ body.dark .sidebar-standard .toggle_switch .switch::before { left: 25px; }
         gap: 8px;
         margin-top: 8px;
         padding: 8px 0 0;
-        border-top: 1px solid rgba(255, 255, 255, .2);
+        border-top: 1px solid var(--primary-color-light, #f6f5ff);
     }
     .sidebar-standard .boton-contenido li { flex: 1; height: 44px; margin-top: 0; }
     .sidebar-standard .modo { height: 44px; }
     .sidebar-standard .sol_luna { height: 44px; }
+}
+
+body.dark .sidebar-standard .boton-contenido {
+    border-top-color: var(--primary-color-light, #3a3b3c);
 }
 
 @media (max-width: 600px) {
@@ -161,6 +169,7 @@ body.dark .sidebar-standard .toggle_switch .switch::before { left: 25px; }
         flex: 0 0 44px;
         width: 100%;
     }
+    .sidebar-standard .boton-contenido li a .texto { flex: 0 1 auto; }
     .sidebar-standard .boton-contenido .nav_texto { padding: 10px 0; }
     .sidebar-standard .barra_menu .modo { margin-top: 10px; }
     .sidebar-standard .barra_menu .modo .sol_luna { margin-left: 0; }
