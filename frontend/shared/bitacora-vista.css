@@ -43,6 +43,23 @@ body.dark [data-audit-view] {
     margin-bottom: 2px;
 }
 
+[data-audit-view] .audit-heading-compact {
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--audit-border);
+}
+
+[data-audit-view] .audit-heading-compact h2 {
+    margin: 3px 0 0;
+    color: var(--audit-ink);
+    font-size: 20px;
+}
+
+[data-audit-view] .audit-heading-compact p {
+    margin: 4px 0 0;
+    color: var(--audit-muted);
+    font-size: 12px;
+}
+
 [data-audit-view] .audit-eyebrow {
     color: var(--module-accent, #277da1);
     font-size: 11px;
