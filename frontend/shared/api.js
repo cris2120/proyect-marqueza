@@ -16,11 +16,14 @@ class MarquezaApi {
     }
 
     static async request(path, options = {}) {
+        const suppressSessionRedirect = options.suppressSessionRedirect === true;
+        const requestOptions = { ...options };
+        delete requestOptions.suppressSessionRedirect;
         const sessionToken = this.sessionToken();
         let response;
         try {
             response = await fetch(`${this.baseUrl}${path}`, {
-                ...options,
+                ...requestOptions,
                 headers: {
                     ...(options.body ? { "Content-Type": "application/json" } : {}),
                     ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
@@ -36,7 +39,7 @@ class MarquezaApi {
             }
             const hasActiveSession = session?.id && sessionStorage.getItem("marqueza_sesion_activa") === String(session.id);
             const isLoginPage = window.location.pathname.endsWith("/inicio_sesion/inicio_sesion.html");
-            if (hasActiveSession && !isLoginPage) {
+            if (hasActiveSession && !isLoginPage && !suppressSessionRedirect) {
                 localStorage.removeItem("marqueza_usuario_sesion");
                 sessionStorage.removeItem("marqueza_sesion_activa");
                 window.location.replace(loginUrl);
@@ -142,3 +145,4 @@ class MarquezaApi {
 }
 
 window.MarquezaApi = MarquezaApi;
+void window.MarquezaAudit?.syncPending?.();

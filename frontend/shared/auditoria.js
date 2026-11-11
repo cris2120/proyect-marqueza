@@ -1,6 +1,8 @@
 (function () {
     const STORAGE_KEY = "marqueza_bitacora";
+    const PENDING_KEY = "marqueza_bitacora_pendientes";
     const MAX_EVENTS = 500;
+    let syncTask = null;
 
     function getSession() {
         try {
@@ -35,6 +37,114 @@
         }
     }
 
+    function saveLocal(events) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(events.slice(0, MAX_EVENTS)));
+        } catch (error) {
+            console.error("No fue posible guardar el evento de auditoría.", error);
+        }
+    }
+
+    function readPending() {
+        try {
+            const pending = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+            return Array.isArray(pending) ? pending : [];
+        } catch (error) {
+            console.error("No fue posible leer la cola de auditoría pendiente.", error);
+            return [];
+        }
+    }
+
+    async function syncPending() {
+        const api = window.MarquezaApi;
+        if (!api) return;
+        try {
+            if (!api.sessionToken()) return;
+        } catch (error) {
+            console.error("No se pudo validar la sesión para sincronizar la bitácora.", error);
+            return;
+        }
+        if (syncTask) return syncTask;
+
+        syncTask = (async () => {
+            try {
+                if (localStorage.getItem(PENDING_KEY) === null) {
+                    localStorage.setItem(PENDING_KEY, JSON.stringify(read()));
+                }
+
+                let pending = readPending();
+                while (pending.length) {
+                    const batch = pending.slice(0, 10);
+                    const settled = await Promise.allSettled(batch.map((event) =>
+                        api.request("/bitacora-auditoria/", {
+                            method: "POST",
+                            body: JSON.stringify(event),
+                            suppressSessionRedirect: true
+                        })
+                    ));
+                    const completedIds = new Set(
+                        settled.flatMap((result, index) => {
+                            if (result.status === "fulfilled") return [batch[index].id];
+                            console.warn("No se pudo sincronizar un evento de auditoría.", result.reason);
+                            return [];
+                        })
+                    );
+                    pending = readPending().filter((event) => !completedIds.has(event.id));
+                    localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+                    if (!completedIds.size) break;
+                }
+            } catch (error) {
+                console.warn("La bitácora central no está disponible; los eventos quedan pendientes.", error);
+            }
+        })().finally(() => {
+            syncTask = null;
+        });
+        return syncTask;
+    }
+
+    function normalizeEvent(event) {
+        return {
+            id: String(event.uuid || event.id || `${event.timestamp}-${event.action}`),
+            timestamp: event.timestamp || event.fecha_hora || "",
+            actor: event.actor || "Sin identificar",
+            email: event.email || event.correo || "",
+            role: event.role || event.rol || "",
+            action: event.action || event.accion || "Actividad",
+            module: event.module || event.modulo || "Sistema",
+            entity: event.entity || event.entidad || "",
+            detail: event.detail || event.detalle || "",
+            outcome: event.outcome || event.resultado || "success"
+        };
+    }
+
+    function mergeEvents(...eventLists) {
+        const uniqueEvents = new Map();
+        eventLists.flat().forEach((rawEvent) => {
+            const event = normalizeEvent(rawEvent);
+            const key = event.id || [event.timestamp, event.actor, event.action, event.module].join("|");
+            uniqueEvents.set(key, event);
+        });
+        return [...uniqueEvents.values()].sort((first, second) =>
+            new Date(second.timestamp).getTime() - new Date(first.timestamp).getTime()
+        );
+    }
+
+    async function loadAll() {
+        const localEvents = read();
+        if (!window.MarquezaApi?.sessionToken()) return localEvents.map(normalizeEvent);
+
+        await syncPending();
+        const serverEvents = await window.MarquezaApi.request("/bitacora-auditoria/", {
+            suppressSessionRedirect: true
+        });
+        if (!Array.isArray(serverEvents)) {
+            throw new Error("La respuesta de la bitácora central no es válida.");
+        }
+        const events = mergeEvents(serverEvents, read());
+        saveLocal(events);
+        return events;
+    }
+
     function log({ action, module = "Sistema", entity = "", detail = "", outcome = "success", actor, email, role }) {
         const session = getSession();
         const event = {
@@ -51,11 +161,14 @@
         };
 
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify([event, ...read()].slice(0, MAX_EVENTS)));
+            saveLocal([event, ...read()]);
+            const pending = readPending();
+            localStorage.setItem(PENDING_KEY, JSON.stringify([event, ...pending]));
         } catch (error) {
             console.error("No fue posible guardar el evento de auditoría.", error);
         }
         window.dispatchEvent(new CustomEvent("marqueza:audit", { detail: event }));
+        void syncPending();
         return event;
     }
 
@@ -82,7 +195,7 @@
         window.location.replace("../inicio_sesion/inicio_sesion.html?motivo=sesion_requerida");
     }
 
-    window.MarquezaAudit = { log, read, recordChange, guardPage };
+    window.MarquezaAudit = { log, read, loadAll, recordChange, guardPage, syncPending };
     window.addEventListener("error", (event) => {
         const page = window.location.pathname.split("/").filter(Boolean).at(-2) || "Aplicación";
         log({ action: "Error de aplicación", module: moduleLabel(page), detail: String(event.message || "Error JavaScript").slice(0, 300), outcome: "error" });
