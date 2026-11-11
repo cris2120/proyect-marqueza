@@ -18,6 +18,26 @@ body.dark [data-audit-view] {
     --audit-soft: #182231;
 }
 
+body.module-actividad [data-audit-view] {
+    --audit-ink: #20383a;
+    --audit-muted: #657b7d;
+    --audit-border: #dce8e7;
+    --audit-surface: #fff;
+    --audit-soft: #f1f7f6;
+    --module-accent: #147d78;
+    --module-accent-soft: rgba(20, 125, 120, 0.1);
+}
+
+body.dark.module-actividad [data-audit-view] {
+    --audit-ink: #e8f2f1;
+    --audit-muted: #a9bfbd;
+    --audit-border: #344d4b;
+    --audit-surface: #202f32;
+    --audit-soft: #19272a;
+    --module-accent: #62c6b8;
+    --module-accent-soft: rgba(98, 198, 184, 0.13);
+}
+
 [data-audit-view] *,
 [data-audit-view] *::before,
 [data-audit-view] *::after {
@@ -348,10 +368,9 @@ body.dark [data-audit-view] {
 
 [data-audit-view] .audit-table th {
     padding: 15px 18px;
-    border-bottom: 1px solid var(--audit-border);
-    border-top: 3px solid var(--module-accent, #277da1);
-    background: linear-gradient(110deg, var(--audit-soft), var(--audit-surface) 85%);
-    color: var(--audit-muted);
+    border-bottom: 1px solid color-mix(in srgb, var(--module-accent, #277da1) 45%, transparent);
+    background: linear-gradient(110deg, color-mix(in srgb, var(--module-accent, #277da1) 92%, #102331), var(--module-accent, #277da1));
+    color: #fff;
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -374,7 +393,7 @@ body.dark [data-audit-view] {
 }
 
 [data-audit-view] .audit-table tbody tr:nth-child(even) {
-    background: color-mix(in srgb, var(--audit-soft) 68%, transparent);
+    background: color-mix(in srgb, var(--module-accent, #277da1) 3%, var(--audit-surface));
 }
 
 [data-audit-view] .audit-table tbody tr:hover {
@@ -386,6 +405,7 @@ body.dark [data-audit-view] {
     min-width: 150px;
     color: var(--audit-muted);
     font-variant-numeric: tabular-nums;
+    font-weight: 600;
     white-space: nowrap;
 }
 
@@ -406,10 +426,10 @@ body.dark [data-audit-view] {
     display: inline-flex;
     align-items: center;
     padding: 5px 8px;
-    border: 1px solid rgba(39, 125, 161, 0.12);
+    border: 1px solid color-mix(in srgb, var(--module-accent, #277da1) 18%, transparent);
     border-radius: 7px;
-    background: rgba(39, 125, 161, 0.11);
-    color: #277da1;
+    background: color-mix(in srgb, var(--module-accent, #277da1) 10%, transparent);
+    color: color-mix(in srgb, var(--module-accent, #277da1) 82%, #102331);
     font-size: 10px;
     font-weight: 800;
     white-space: nowrap;
@@ -465,14 +485,13 @@ body.dark.module-usuarios .cont_tabla {
 }
 
 .module-usuarios .cont_tabla thead {
-    background: linear-gradient(110deg, #eaf5fa, #f8fbfd 85%);
+    background: linear-gradient(110deg, #174d68, #176b86);
 }
 
 .module-usuarios .cont_tabla th {
     padding: 15px 18px;
-    border-bottom: 1px solid #e6ebf1;
-    border-top: 3px solid var(--user-accent);
-    color: #64788a;
+    border-bottom: 1px solid #2f7b95;
+    color: #fff;
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -484,11 +503,11 @@ body.dark.module-usuarios .cont_tabla {
 }
 
 .module-usuarios .cont_tabla tbody tr:nth-child(even) {
-    background: #f8fbfd;
+    background: #f4f8fa;
 }
 
 .module-usuarios .cont_tabla tbody tr:hover {
-    background: #eff8fc;
+    background: #eaf4f8;
     box-shadow: inset 3px 0 var(--user-accent);
 }
 
@@ -499,7 +518,7 @@ body.dark.module-usuarios .cont_tabla {
 }
 
 .module-usuarios .cont_tabla td:nth-child(3) {
-    color: #277da1;
+    color: #176b86;
     font-weight: 700;
 }
 
@@ -546,7 +565,7 @@ body.dark.module-usuarios .cont_tabla {
 }
 
 body.dark.module-usuarios .cont_tabla thead {
-    background: linear-gradient(110deg, #263544, #303d4d);
+    background: linear-gradient(110deg, #173b4c, #1d5266);
 }
 
 body.dark.module-usuarios .cont_tabla th,
@@ -556,11 +575,15 @@ body.dark.module-usuarios .cont_tabla .usuarios-pagination {
 }
 
 body.dark.module-usuarios .cont_tabla tbody tr:nth-child(even) {
-    background: #263544;
+    background: #202f3e;
 }
 
 body.dark.module-usuarios .cont_tabla tbody tr:hover {
-    background: #304353;
+    background: #263e4d;
+}
+
+body.dark.module-usuarios .cont_tabla td:nth-child(3) {
+    color: #91d9f5;
 }
 
 body.dark.module-usuarios .cont_tabla .btn-editar {
@@ -648,9 +671,9 @@ body.dark.module-usuarios .cont_tabla .btn-eliminar {
 }
 
 body.dark [data-audit-view] .audit-badge {
-    border-color: #31556a;
-    background: #20394a;
-    color: #91d9f5;
+    border-color: color-mix(in srgb, var(--module-accent, #91d9f5) 25%, transparent);
+    background: color-mix(in srgb, var(--module-accent, #91d9f5) 15%, var(--audit-surface));
+    color: var(--module-accent, #91d9f5);
 }
 
 body.dark [data-audit-view] .audit-badge-denied {
@@ -663,6 +686,18 @@ body.dark [data-audit-view] .audit-badge-error {
     border-color: #633d48;
     background: #402d37;
     color: #ffabb2;
+}
+
+[data-audit-view] .audit-table td:nth-child(2) {
+    font-weight: 700;
+}
+
+body.dark [data-audit-view] .audit-table th {
+    border-bottom-color: color-mix(in srgb, var(--module-accent, #277da1) 55%, #17232c);
+}
+
+[data-audit-view] .audit-table tbody tr:last-child td {
+    border-bottom: 0;
 }
 
 [data-audit-view] .audit-note i {
@@ -734,6 +769,95 @@ body.dark [data-audit-view] .audit-badge-error {
 
     [data-audit-view] .audit-pagination button {
         padding: 0 8px;
+    }
+}
+
+@media (max-width: 680px) {
+    [data-audit-view] .audit-table-scroll {
+        overflow: visible;
+    }
+
+    [data-audit-view] .audit-table {
+        display: block;
+        min-width: 0;
+        table-layout: fixed;
+    }
+
+    [data-audit-view] .audit-table thead {
+        display: none;
+    }
+
+    [data-audit-view] .audit-table,
+    [data-audit-view] .audit-table tbody,
+    [data-audit-view] .audit-table tr,
+    [data-audit-view] .audit-table td {
+        width: 100%;
+    }
+
+    [data-audit-view] .audit-table tbody {
+        display: grid;
+        gap: 12px;
+        padding: 12px;
+    }
+
+    [data-audit-view] .audit-table tbody tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 16px;
+        padding: 8px 14px;
+        border: 1px solid var(--audit-border);
+        border-radius: 13px;
+        background: var(--audit-surface);
+        box-shadow: 0 5px 14px rgba(18, 48, 74, 0.05);
+    }
+
+    [data-audit-view] .audit-table td {
+        display: flex;
+        min-width: 0;
+        max-width: none;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        text-align: right;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    [data-audit-view] .audit-table td::before {
+        flex: 0 0 auto;
+        color: var(--audit-muted);
+        content: "";
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-align: left;
+        text-transform: uppercase;
+    }
+
+    [data-audit-view] .audit-table td:nth-child(1) {
+        grid-column: 1 / -1;
+    }
+
+    [data-audit-view] .audit-table td:nth-child(1)::before { content: "Fecha y hora"; }
+    [data-audit-view] .audit-table td:nth-child(2)::before { content: "Persona"; }
+    [data-audit-view] .audit-table td:nth-child(3)::before { content: "Evento"; }
+    [data-audit-view] .audit-table td:nth-child(4)::before { content: "Módulo"; }
+    [data-audit-view] .audit-table td:nth-child(5) {
+        grid-column: 1 / -1;
+        border-bottom: 0;
+    }
+    [data-audit-view] .audit-table td:nth-child(5)::before { content: "Detalle"; }
+
+    [data-audit-view][data-audit-mode="logins"] .audit-table td:nth-child(2)::before { content: "Usuario"; }
+    [data-audit-view][data-audit-mode="logins"] .audit-table td:nth-child(3)::before { content: "Correo"; }
+    [data-audit-view][data-audit-mode="logins"] .audit-table td:nth-child(4)::before { content: "Rol"; }
+    [data-audit-view][data-audit-mode="logins"] .audit-table td:nth-child(3) {
+        grid-column: 1 / -1;
+    }
+
+    body.dark [data-audit-view] .audit-table tbody tr {
+        background: var(--audit-surface);
     }
 }
 
