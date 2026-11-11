@@ -16,15 +16,16 @@ class LoginForm {
         this.password.type = isPasswordHidden ? "text" : "password";
         this.passwordToggle.setAttribute("aria-label", isPasswordHidden ? "Ocultar contraseña" : "Mostrar contraseña");
         this.passwordToggle.setAttribute("aria-pressed", String(isPasswordHidden));
-        this.passwordToggle.querySelector("i").className = `bx ${isPasswordHidden ? "bx-hide" : "bx-show"}`;
+        this.passwordToggle.querySelector(".password-icon-show").hidden = !isPasswordHidden;
+        this.passwordToggle.querySelector(".password-icon-hide").hidden = isPasswordHidden;
     }
 
     async submit(event) {
         event.preventDefault();
-        const username = this.username?.value.trim() || "";
+        const username = this.username?.value || "";
         const password = this.password?.value || "";
 
-        if (!username || !password) {
+        if (!username.length || !password.length) {
             return Swal.fire({ icon: "warning", title: "Campos incompletos", text: "Por favor completa todos los campos." });
         }
 

@@ -68,7 +68,7 @@ def login():
     if request.method == "OPTIONS":
         return "", 204
     data = request.get_json(silent=True) or {}
-    identificador = str(data.get("correo") or data.get("usuario") or "").strip()
+    identificador = str(data.get("correo") or data.get("usuario") or "")
     contrasena = data.get("contrasena") or data.get("password") or ""
 
     if not identificador:
@@ -81,7 +81,8 @@ def login():
                   u.USUA_ESTADO, u.USUA_DET_ETC_ID, d.DET_ETC_NOMBRE
            FROM T_USUARIOS u
            JOIN T_DETALLES_ETC d ON d.DET_ETC_ID = u.USUA_DET_ETC_ID
-           WHERE u.USUA_CORREO = %s OR u.USUA_NOMBRE = %s
+           WHERE BINARY u.USUA_CORREO = BINARY %s
+              OR BINARY u.USUA_NOMBRE = BINARY %s
            LIMIT 1""",
         (identificador, identificador),
     )
