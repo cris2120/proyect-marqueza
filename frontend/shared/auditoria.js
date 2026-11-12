@@ -6,7 +6,20 @@
 
     function getSession() {
         try {
-            const session = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+            let storedSession = sessionStorage.getItem("marqueza_usuario_sesion");
+            if (!storedSession) {
+                const legacySession = localStorage.getItem("marqueza_usuario_sesion");
+                const parsedLegacySession = JSON.parse(legacySession || "null");
+                if (
+                    parsedLegacySession?.id
+                    && sessionStorage.getItem("marqueza_sesion_activa") === String(parsedLegacySession.id)
+                ) {
+                    storedSession = legacySession;
+                    sessionStorage.setItem("marqueza_usuario_sesion", legacySession);
+                    localStorage.removeItem("marqueza_usuario_sesion");
+                }
+            }
+            const session = JSON.parse(storedSession || "null");
             return session && typeof session === "object" ? session : null;
         } catch {
             return null;
@@ -192,7 +205,7 @@
         if (isPublicAccessPage() || hasActiveSession()) return;
         const path = `${window.location.pathname}${window.location.search}`;
         log({ action: "Acceso denegado", module: "Acceso", entity: "Sesión requerida", detail: `Intento de acceso sin sesión a ${path}`, outcome: "denied" });
-        window.location.replace("../inicio_sesion/inicio_sesion.html?motivo=sesion_requerida");
+        window.location.replace("../inicio_sesion/inicio_sesion.html");
     }
 
     window.MarquezaAudit = { log, read, loadAll, recordChange, guardPage, syncPending };

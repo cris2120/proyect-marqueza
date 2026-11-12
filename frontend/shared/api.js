@@ -33,14 +33,14 @@ class MarquezaApi {
         } catch {
             let session = null;
             try {
-                session = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+                session = JSON.parse(this.sessionData() || "null");
             } catch {
                 session = null;
             }
             const hasActiveSession = session?.id && sessionStorage.getItem("marqueza_sesion_activa") === String(session.id);
             const isLoginPage = window.location.pathname.endsWith("/inicio_sesion/inicio_sesion.html");
             if (hasActiveSession && !isLoginPage && !suppressSessionRedirect) {
-                localStorage.removeItem("marqueza_usuario_sesion");
+                sessionStorage.removeItem("marqueza_usuario_sesion");
                 sessionStorage.removeItem("marqueza_sesion_activa");
                 window.location.replace(loginUrl);
             }
@@ -63,7 +63,7 @@ class MarquezaApi {
                 && sessionToken
                 && (!path.startsWith("/auth/") || path === "/auth/heartbeat")
             ) {
-                localStorage.removeItem("marqueza_usuario_sesion");
+                sessionStorage.removeItem("marqueza_usuario_sesion");
                 sessionStorage.removeItem("marqueza_sesion_activa");
                 window.location.replace(expiredSessionUrl);
             }
@@ -77,7 +77,7 @@ class MarquezaApi {
     }
 
     static sessionToken() {
-        const storedSession = localStorage.getItem("marqueza_usuario_sesion");
+        const storedSession = this.sessionData();
         if (!storedSession) return null;
 
         let session;
@@ -88,6 +88,29 @@ class MarquezaApi {
             throw new Error("No fue posible leer la sesión almacenada. Cierra sesión y vuelve a ingresar.");
         }
         return typeof session?.token === "string" && session.token ? session.token : null;
+    }
+
+    static sessionData() {
+        let session = sessionStorage.getItem("marqueza_usuario_sesion");
+        if (session) return session;
+
+        const legacySession = localStorage.getItem("marqueza_usuario_sesion");
+        if (!legacySession) return null;
+
+        try {
+            const parsedSession = JSON.parse(legacySession);
+            if (
+                !parsedSession?.id
+                || sessionStorage.getItem("marqueza_sesion_activa") !== String(parsedSession.id)
+            ) return null;
+
+            sessionStorage.setItem("marqueza_usuario_sesion", legacySession);
+            localStorage.removeItem("marqueza_usuario_sesion");
+            return legacySession;
+        } catch (error) {
+            console.error("No fue posible migrar la sesión de esta pestaña.", error);
+            return null;
+        }
     }
 
     static list(resource) {
@@ -157,11 +180,9 @@ window.MarquezaApi = MarquezaApi;
 let sessionHeartbeatInProgress = false;
 
 async function sendSessionHeartbeat() {
-    if (window.location.pathname.endsWith("/inicio_sesion/inicio_sesion.html")) return;
-
     let session;
     try {
-        session = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+        session = JSON.parse(MarquezaApi.sessionData() || "null");
     } catch (error) {
         console.error("No fue posible leer la sesión activa.", error);
         return;
@@ -202,7 +223,7 @@ function respondToSessionConflict(request) {
 
     let session;
     try {
-        session = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+        session = JSON.parse(MarquezaApi.sessionData() || "null");
     } catch (error) {
         console.error("No fue posible leer la sesión activa.", error);
         return;
@@ -236,14 +257,17 @@ function respondToSessionConflict(request) {
 
         try {
             await MarquezaApi.request("/auth/logout", { method: "POST" });
+            sessionStorage.removeItem("marqueza_usuario_sesion");
+            sessionStorage.removeItem("marqueza_sesion_activa");
+            localStorage.setItem(`${sessionConflictResponsePrefix}${request.id}`, JSON.stringify({ approved: true }));
             window.MarquezaAudit?.log({
                 action: "Cierre de sesión",
                 module: "Acceso",
-                detail: "La sesión se cerró desde otra pestaña a petición del usuario."
+                detail: "La sesión se cerró desde otra pestaña a petición del usuario.",
+                actor: session.nombre,
+                email: session.correo,
+                role: session.rol
             });
-            localStorage.removeItem("marqueza_usuario_sesion");
-            sessionStorage.removeItem("marqueza_sesion_activa");
-            localStorage.setItem(`${sessionConflictResponsePrefix}${request.id}`, JSON.stringify({ approved: true }));
             const logoutUrl = new URL("../inicio_sesion/inicio_sesion.html", document.currentScript?.src || window.location.href);
             window.location.replace(logoutUrl);
         } catch (error) {

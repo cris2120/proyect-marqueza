@@ -45,7 +45,8 @@ class LoginForm {
             }
 
             const user = result.usuario;
-            localStorage.setItem("marqueza_usuario_sesion", JSON.stringify({ ...user, token: result.token }));
+            sessionStorage.setItem("marqueza_usuario_sesion", JSON.stringify({ ...user, token: result.token }));
+            localStorage.removeItem("marqueza_usuario_sesion");
             sessionStorage.setItem("marqueza_sesion_activa", String(user.id));
             window.MarquezaAudit?.log({ action: "Inicio de sesión", module: "Acceso", detail: "Inicio de sesión autorizado.", actor: user.nombre, email: user.correo, role: user.rol });
             window.location.replace("../inicio/inicio.html");
@@ -65,6 +66,32 @@ class LoginForm {
     }
 
     async requestSessionClosure(usuarioId) {
+        const currentSession = JSON.parse(window.MarquezaApi.sessionData() || "null");
+        if (String(currentSession?.id) === String(usuarioId)) {
+            const result = await window.Swal?.fire({
+                icon: "warning",
+                title: "Usuario activo en esta pestaña",
+                text: "Este usuario ya tiene una sesión abierta aquí. ¿Quieres cerrarla para continuar?",
+                showCancelButton: true,
+                confirmButtonText: "Sí, cerrar sesión",
+                cancelButtonText: "No, mantener sesión"
+            });
+            if (!result?.isConfirmed) return false;
+
+            await window.MarquezaApi.request("/auth/logout", { method: "POST" });
+            sessionStorage.removeItem("marqueza_usuario_sesion");
+            sessionStorage.removeItem("marqueza_sesion_activa");
+            window.MarquezaAudit?.log({
+                action: "Cierre de sesión",
+                module: "Acceso",
+                detail: "La sesión se cerró desde la pestaña actual para iniciar sesión nuevamente.",
+                actor: currentSession.nombre,
+                email: currentSession.correo,
+                role: currentSession.rol
+            });
+            return true;
+        }
+
         const requestId = window.crypto?.randomUUID?.()
             || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const responseKey = `marqueza_respuesta_cierre_sesion_${requestId}`;
@@ -131,7 +158,7 @@ class LoginForm {
             };
             window.addEventListener("storage", onStorage);
             const pollId = window.setInterval(readResponse, 300);
-            const timeoutId = window.setTimeout(() => finish(null), 10000);
+            const timeoutId = window.setTimeout(() => finish(null), 60000);
             readResponse();
         });
     }
