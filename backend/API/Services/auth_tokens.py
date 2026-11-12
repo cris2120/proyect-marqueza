@@ -18,13 +18,6 @@ class TokenConfigurationError(RuntimeError):
     """La configuración del token de acceso está incompleta."""
 
 
-ACTIVE_SESSION_TTL_MINUTES = 2
-
-
-class ActiveSessionError(RuntimeError):
-    """El usuario ya tiene una sesión activa."""
-
-
 def _secret_bytes(secret):
     if not isinstance(secret, str) or len(secret) < 32:
         raise TokenConfigurationError(
@@ -120,7 +113,6 @@ def ensure_access_token_table():
                    TOKEN_JTI_HASH CHAR(64) NOT NULL PRIMARY KEY,
                    TOKEN_USUA_ID INT NOT NULL,
                    TOKEN_CREADO TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                   TOKEN_ULTIMA_ACTIVIDAD TIMESTAMP NULL DEFAULT NULL,
                    TOKEN_REVOCADO TIMESTAMP NULL DEFAULT NULL,
                    INDEX IDX_API_TOKEN_USUARIO_ACTIVO (TOKEN_USUA_ID, TOKEN_REVOCADO),
                    CONSTRAINT FK_API_TOKEN_USUARIO
@@ -128,11 +120,6 @@ def ensure_access_token_table():
                        ON DELETE CASCADE
                ) ENGINE=InnoDB"""
         )
-        cursor.execute("SHOW COLUMNS FROM T_API_TOKENS LIKE %s", ("TOKEN_ULTIMA_ACTIVIDAD",))
-        if cursor.fetchone() is None:
-            cursor.execute(
-                "ALTER TABLE T_API_TOKENS ADD COLUMN TOKEN_ULTIMA_ACTIVIDAD TIMESTAMP NULL DEFAULT NULL"
-            )
         current_app.mysql.connection.commit()
         current_app.config["API_TOKEN_TABLE_READY"] = True
     except Exception:
@@ -147,45 +134,10 @@ def register_access_token(token_id, user_id):
     cursor = current_app.mysql.connection.cursor()
     try:
         cursor.execute(
-            "SELECT USUA_ID, USUA_NOMBRE FROM T_USUARIOS WHERE USUA_ID = %s FOR UPDATE",
-            (user_id,),
-        )
-        user = cursor.fetchone()
-        if user is None:
-            raise InvalidAccessToken("La cuenta de usuario ya no está disponible.")
-
-        is_admin_user = user[1] == "Admin"
-        if not is_admin_user:
-            cursor.execute(
-                f"""SELECT 1
-                   FROM T_API_TOKENS
-                   WHERE TOKEN_USUA_ID = %s
-                     AND TOKEN_REVOCADO IS NULL
-                     AND TOKEN_ULTIMA_ACTIVIDAD >= CURRENT_TIMESTAMP - INTERVAL {ACTIVE_SESSION_TTL_MINUTES} MINUTE
-                   LIMIT 1
-                   FOR UPDATE""",
-                (user_id,),
-            )
-            if cursor.fetchone() is not None:
-                raise ActiveSessionError()
-
-        if not is_admin_user:
-            cursor.execute(
-                """UPDATE T_API_TOKENS
-                   SET TOKEN_REVOCADO = CURRENT_TIMESTAMP
-                   WHERE TOKEN_USUA_ID = %s AND TOKEN_REVOCADO IS NULL""",
-                (user_id,),
-            )
-        cursor.execute(
-            """INSERT INTO T_API_TOKENS
-               (TOKEN_JTI_HASH, TOKEN_USUA_ID, TOKEN_ULTIMA_ACTIVIDAD)
-               VALUES (%s, %s, CURRENT_TIMESTAMP)""",
+            "INSERT INTO T_API_TOKENS (TOKEN_JTI_HASH, TOKEN_USUA_ID) VALUES (%s, %s)",
             (_token_fingerprint(token_id), user_id),
         )
         current_app.mysql.connection.commit()
-    except ActiveSessionError:
-        current_app.mysql.connection.rollback()
-        raise
     except Exception:
         current_app.mysql.connection.rollback()
         raise
@@ -197,7 +149,7 @@ def is_access_token_active(token_id):
     cursor = current_app.mysql.connection.cursor()
     try:
         cursor.execute(
-            f"""SELECT 1
+            """SELECT 1
                FROM T_API_TOKENS t
                JOIN T_USUARIOS u ON u.USUA_ID = t.TOKEN_USUA_ID
                WHERE t.TOKEN_JTI_HASH = %s
@@ -207,24 +159,6 @@ def is_access_token_active(token_id):
             (_token_fingerprint(token_id),),
         )
         return cursor.fetchone() is not None
-    finally:
-        cursor.close()
-
-
-def touch_access_token(token_id):
-    cursor = current_app.mysql.connection.cursor()
-    try:
-        cursor.execute(
-            """UPDATE T_API_TOKENS
-               SET TOKEN_ULTIMA_ACTIVIDAD = CURRENT_TIMESTAMP
-               WHERE TOKEN_JTI_HASH = %s AND TOKEN_REVOCADO IS NULL""",
-            (_token_fingerprint(token_id),),
-        )
-        current_app.mysql.connection.commit()
-        return cursor.rowcount > 0
-    except Exception:
-        current_app.mysql.connection.rollback()
-        raise
     finally:
         cursor.close()
 

@@ -32,7 +32,7 @@ class MarquezaNavigation {
                 } catch (error) {
                     await window.MarquezaApi?.notifyError(error, "No se pudo revocar la sesión");
                 } finally {
-                    sessionStorage.removeItem("marqueza_usuario_sesion");
+                    localStorage.removeItem("marqueza_usuario_sesion");
                     sessionStorage.removeItem("marqueza_sesion_activa");
                     window.location.replace(logout.href);
                 }
