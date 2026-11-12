@@ -89,9 +89,22 @@ class AccessTokenRegistrationTests(unittest.TestCase):
 
         self.connection.commit.assert_called_once()
         self.connection.rollback.assert_not_called()
-        self.assertEqual(self.cursor.execute.call_count, 3)
+        self.assertEqual(self.cursor.execute.call_count, 4)
         session_query = self.cursor.execute.call_args_list[1].args[0]
         self.assertIn("TOKEN_ULTIMA_ACTIVIDAD >= CURRENT_TIMESTAMP - INTERVAL 2 MINUTE", session_query)
+        self.assertIn("SET TOKEN_REVOCADO = CURRENT_TIMESTAMP", self.cursor.execute.call_args_list[2].args[0])
+
+    def test_api_token_validity_does_not_depend_on_heartbeat_age(self):
+        from Services.auth_tokens import is_access_token_active
+
+        self.cursor.fetchone.return_value = (1,)
+
+        with self.app.app_context():
+            self.assertTrue(is_access_token_active("token-id"))
+
+        validation_query = self.cursor.execute.call_args.args[0]
+        self.assertIn("TOKEN_REVOCADO IS NULL", validation_query)
+        self.assertNotIn("TOKEN_ULTIMA_ACTIVIDAD", validation_query)
 
     def test_touching_a_session_updates_its_activity(self):
         self.cursor.rowcount = 1

@@ -167,6 +167,12 @@ def register_access_token(token_id, user_id):
             raise ActiveSessionError()
 
         cursor.execute(
+            """UPDATE T_API_TOKENS
+               SET TOKEN_REVOCADO = CURRENT_TIMESTAMP
+               WHERE TOKEN_USUA_ID = %s AND TOKEN_REVOCADO IS NULL""",
+            (user_id,),
+        )
+        cursor.execute(
             """INSERT INTO T_API_TOKENS
                (TOKEN_JTI_HASH, TOKEN_USUA_ID, TOKEN_ULTIMA_ACTIVIDAD)
                VALUES (%s, %s, CURRENT_TIMESTAMP)""",
@@ -192,7 +198,6 @@ def is_access_token_active(token_id):
                JOIN T_USUARIOS u ON u.USUA_ID = t.TOKEN_USUA_ID
                WHERE t.TOKEN_JTI_HASH = %s
                  AND t.TOKEN_REVOCADO IS NULL
-                 AND t.TOKEN_ULTIMA_ACTIVIDAD >= CURRENT_TIMESTAMP - INTERVAL {ACTIVE_SESSION_TTL_MINUTES} MINUTE
                  AND u.USUA_ESTADO = 'Activo'
                LIMIT 1""",
             (_token_fingerprint(token_id),),
