@@ -220,11 +220,4 @@ window.addEventListener("storage", event => {
     }
 });
 
-try {
-    const pendingSessionConflict = JSON.parse(localStorage.getItem(sessionConflictRequestKey) || "null");
-    respondToSessionConflict(pendingSessionConflict);
-} catch (error) {
-    console.error("No fue posible leer la solicitud de cierre de sesión.", error);
-}
-
 void window.MarquezaAudit?.syncPending?.();
