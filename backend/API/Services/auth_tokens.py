@@ -147,31 +147,35 @@ def register_access_token(token_id, user_id):
     cursor = current_app.mysql.connection.cursor()
     try:
         cursor.execute(
-            "SELECT USUA_ID FROM T_USUARIOS WHERE USUA_ID = %s FOR UPDATE",
+            "SELECT USUA_ID, USUA_NOMBRE FROM T_USUARIOS WHERE USUA_ID = %s FOR UPDATE",
             (user_id,),
         )
-        if cursor.fetchone() is None:
+        user = cursor.fetchone()
+        if user is None:
             raise InvalidAccessToken("La cuenta de usuario ya no está disponible.")
 
-        cursor.execute(
-            f"""SELECT 1
-               FROM T_API_TOKENS
-               WHERE TOKEN_USUA_ID = %s
-                 AND TOKEN_REVOCADO IS NULL
-                 AND TOKEN_ULTIMA_ACTIVIDAD >= CURRENT_TIMESTAMP - INTERVAL {ACTIVE_SESSION_TTL_MINUTES} MINUTE
-               LIMIT 1
-               FOR UPDATE""",
-            (user_id,),
-        )
-        if cursor.fetchone() is not None:
-            raise ActiveSessionError()
+        is_admin_user = user[1] == "Admin"
+        if not is_admin_user:
+            cursor.execute(
+                f"""SELECT 1
+                   FROM T_API_TOKENS
+                   WHERE TOKEN_USUA_ID = %s
+                     AND TOKEN_REVOCADO IS NULL
+                     AND TOKEN_ULTIMA_ACTIVIDAD >= CURRENT_TIMESTAMP - INTERVAL {ACTIVE_SESSION_TTL_MINUTES} MINUTE
+                   LIMIT 1
+                   FOR UPDATE""",
+                (user_id,),
+            )
+            if cursor.fetchone() is not None:
+                raise ActiveSessionError()
 
-        cursor.execute(
-            """UPDATE T_API_TOKENS
-               SET TOKEN_REVOCADO = CURRENT_TIMESTAMP
-               WHERE TOKEN_USUA_ID = %s AND TOKEN_REVOCADO IS NULL""",
-            (user_id,),
-        )
+        if not is_admin_user:
+            cursor.execute(
+                """UPDATE T_API_TOKENS
+                   SET TOKEN_REVOCADO = CURRENT_TIMESTAMP
+                   WHERE TOKEN_USUA_ID = %s AND TOKEN_REVOCADO IS NULL""",
+                (user_id,),
+            )
         cursor.execute(
             """INSERT INTO T_API_TOKENS
                (TOKEN_JTI_HASH, TOKEN_USUA_ID, TOKEN_ULTIMA_ACTIVIDAD)
