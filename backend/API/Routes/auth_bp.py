@@ -14,6 +14,7 @@ from Services.auth_tokens import (
     create_access_token,
     register_access_token,
     revoke_access_token,
+    touch_access_token,
 )
 from Services.helpers import hash_password, query, verify_password
 
@@ -67,7 +68,7 @@ def send_reset_email(recipient, reset_url):
 @auth_bp.after_request
 def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
     return response
 
@@ -147,6 +148,19 @@ def login():
             "rol_id": usuario["USUA_DET_ETC_ID"]
         }
     }), 200
+
+
+@auth_bp.route("/heartbeat", methods=["POST", "OPTIONS"])
+def heartbeat():
+    if request.method == "OPTIONS":
+        return "", 204
+    try:
+        if not touch_access_token(g.api_user["jti"]):
+            return jsonify({"message": "La sesión ya no está activa."}), 401
+    except MySQLError:
+        current_app.logger.exception("No se pudo actualizar la actividad de la sesión.")
+        return jsonify({"message": "No se pudo actualizar la sesión."}), 503
+    return "", 204
 
 
 @auth_bp.route("/logout", methods=["POST", "OPTIONS"])

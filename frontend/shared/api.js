@@ -58,7 +58,11 @@ class MarquezaApi {
         }
         if (!response.ok) {
             const message = payload?.mensaje || payload?.message || `Error HTTP ${response.status}`;
-            if (response.status === 401 && sessionToken && !path.startsWith("/auth/")) {
+            if (
+                response.status === 401
+                && sessionToken
+                && (!path.startsWith("/auth/") || path === "/auth/heartbeat")
+            ) {
                 localStorage.removeItem("marqueza_usuario_sesion");
                 sessionStorage.removeItem("marqueza_sesion_activa");
                 window.location.replace(expiredSessionUrl);
@@ -149,6 +153,44 @@ class MarquezaApi {
 }
 
 window.MarquezaApi = MarquezaApi;
+
+let sessionHeartbeatInProgress = false;
+
+async function sendSessionHeartbeat() {
+    if (window.location.pathname.endsWith("/inicio_sesion/inicio_sesion.html")) return;
+
+    let session;
+    try {
+        session = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+    } catch (error) {
+        console.error("No fue posible leer la sesión activa.", error);
+        return;
+    }
+
+    if (
+        !session?.id
+        || sessionStorage.getItem("marqueza_sesion_activa") !== String(session.id)
+        || sessionHeartbeatInProgress
+    ) return;
+
+    sessionHeartbeatInProgress = true;
+    try {
+        await MarquezaApi.request("/auth/heartbeat", {
+            method: "POST",
+            suppressSessionRedirect: true
+        });
+    } catch (error) {
+        console.warn("No se pudo actualizar la actividad de la sesión.", error);
+    } finally {
+        sessionHeartbeatInProgress = false;
+    }
+}
+
+void sendSessionHeartbeat();
+window.setInterval(sendSessionHeartbeat, 60000);
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void sendSessionHeartbeat();
+});
 
 const sessionConflictRequestKey = "marqueza_solicitud_cierre_sesion";
 const sessionConflictResponsePrefix = "marqueza_respuesta_cierre_sesion_";

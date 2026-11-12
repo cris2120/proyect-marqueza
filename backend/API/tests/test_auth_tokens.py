@@ -10,6 +10,7 @@ from Services.auth_tokens import (
     TokenConfigurationError,
     create_access_token,
     register_access_token,
+    touch_access_token,
     verify_access_token,
 )
 
@@ -89,6 +90,18 @@ class AccessTokenRegistrationTests(unittest.TestCase):
         self.connection.commit.assert_called_once()
         self.connection.rollback.assert_not_called()
         self.assertEqual(self.cursor.execute.call_count, 3)
+        session_query = self.cursor.execute.call_args_list[1].args[0]
+        self.assertIn("TOKEN_ULTIMA_ACTIVIDAD >= CURRENT_TIMESTAMP - INTERVAL 5 MINUTE", session_query)
+
+    def test_touching_a_session_updates_its_activity(self):
+        self.cursor.rowcount = 1
+
+        with self.app.app_context():
+            self.assertTrue(touch_access_token("token-id"))
+
+        self.cursor.execute.assert_called_once()
+        self.assertIn("TOKEN_ULTIMA_ACTIVIDAD = CURRENT_TIMESTAMP", self.cursor.execute.call_args.args[0])
+        self.connection.commit.assert_called_once()
 
 
 if __name__ == "__main__":
