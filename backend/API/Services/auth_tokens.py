@@ -18,11 +18,11 @@ class TokenConfigurationError(RuntimeError):
     """La configuración del token de acceso está incompleta."""
 
 
+ACTIVE_SESSION_TTL_MINUTES = 2
+
+
 class ActiveSessionError(RuntimeError):
     """El usuario ya tiene una sesión activa."""
-
-
-ACTIVE_SESSION_TTL_MINUTES = 5
 
 
 def _secret_bytes(secret):

@@ -91,7 +91,7 @@ class AccessTokenRegistrationTests(unittest.TestCase):
         self.connection.rollback.assert_not_called()
         self.assertEqual(self.cursor.execute.call_count, 3)
         session_query = self.cursor.execute.call_args_list[1].args[0]
-        self.assertIn("TOKEN_ULTIMA_ACTIVIDAD >= CURRENT_TIMESTAMP - INTERVAL 5 MINUTE", session_query)
+        self.assertIn("TOKEN_ULTIMA_ACTIVIDAD >= CURRENT_TIMESTAMP - INTERVAL 2 MINUTE", session_query)
 
     def test_touching_a_session_updates_its_activity(self):
         self.cursor.rowcount = 1

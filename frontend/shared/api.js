@@ -187,7 +187,7 @@ async function sendSessionHeartbeat() {
 }
 
 void sendSessionHeartbeat();
-window.setInterval(sendSessionHeartbeat, 60000);
+window.setInterval(sendSessionHeartbeat, 20000);
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") void sendSessionHeartbeat();
 });

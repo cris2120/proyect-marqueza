@@ -75,12 +75,6 @@ class LoginForm {
             usuarioId,
             createdAt: Date.now()
         }));
-        await window.Swal?.fire({
-            icon: "warning",
-            title: "Usuario activo en otra pestaña",
-            text: "Este usuario ya tiene una sesión activa. Se ha solicitado permiso para cerrarla desde la pestaña abierta.",
-            confirmButtonText: "Entendido"
-        });
 
         try {
             const result = await response;
@@ -94,8 +88,8 @@ class LoginForm {
             } else {
                 await window.Swal?.fire({
                     icon: "info",
-                    title: "No se recibió respuesta",
-                    text: "No se pudo confirmar el cierre desde la pestaña activa. Inténtalo de nuevo cuando esa sesión se haya cerrado."
+                    title: "No se encontró una pestaña abierta",
+                    text: "El servidor todavía registra una sesión reciente, pero ninguna pestaña respondió. Espera un par de minutos e intenta de nuevo."
                 });
             }
             return false;
@@ -137,7 +131,7 @@ class LoginForm {
             };
             window.addEventListener("storage", onStorage);
             const pollId = window.setInterval(readResponse, 300);
-            const timeoutId = window.setTimeout(() => finish(null), 60000);
+            const timeoutId = window.setTimeout(() => finish(null), 10000);
             readResponse();
         });
     }
