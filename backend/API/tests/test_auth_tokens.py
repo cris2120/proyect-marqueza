@@ -1,9 +1,15 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+from flask import Flask
 
 from Services.auth_tokens import (
+    ActiveSessionError,
     InvalidAccessToken,
     TokenConfigurationError,
     create_access_token,
+    register_access_token,
     verify_access_token,
 )
 
@@ -53,6 +59,36 @@ class AccessTokenTests(unittest.TestCase):
     def test_short_secret_is_rejected(self):
         with self.assertRaises(TokenConfigurationError):
             create_access_token("user-123", "Administrador", "too-short", 3600)
+
+
+class AccessTokenRegistrationTests(unittest.TestCase):
+    def setUp(self):
+        self.app = Flask(__name__)
+        self.app.config["API_TOKEN_TABLE_READY"] = True
+        self.cursor = MagicMock()
+        self.connection = MagicMock()
+        self.connection.cursor.return_value = self.cursor
+        self.app.mysql = SimpleNamespace(connection=self.connection)
+
+    def test_existing_user_session_prevents_registering_another_token(self):
+        self.cursor.fetchone.side_effect = [(1,), (1,)]
+
+        with self.app.app_context(), self.assertRaises(ActiveSessionError):
+            register_access_token("new-token-id", 1)
+
+        self.connection.rollback.assert_called_once()
+        self.connection.commit.assert_not_called()
+        self.assertEqual(self.cursor.execute.call_count, 2)
+
+    def test_user_without_an_active_session_can_register_token(self):
+        self.cursor.fetchone.side_effect = [(1,), None]
+
+        with self.app.app_context():
+            register_access_token("new-token-id", 1)
+
+        self.connection.commit.assert_called_once()
+        self.connection.rollback.assert_not_called()
+        self.assertEqual(self.cursor.execute.call_count, 3)
 
 
 if __name__ == "__main__":

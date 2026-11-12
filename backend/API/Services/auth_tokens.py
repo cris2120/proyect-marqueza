@@ -18,6 +18,10 @@ class TokenConfigurationError(RuntimeError):
     """La configuración del token de acceso está incompleta."""
 
 
+class ActiveSessionError(RuntimeError):
+    """El usuario ya tiene una sesión activa."""
+
+
 def _secret_bytes(secret):
     if not isinstance(secret, str) or len(secret) < 32:
         raise TokenConfigurationError(
@@ -134,10 +138,31 @@ def register_access_token(token_id, user_id):
     cursor = current_app.mysql.connection.cursor()
     try:
         cursor.execute(
+            "SELECT USUA_ID FROM T_USUARIOS WHERE USUA_ID = %s FOR UPDATE",
+            (user_id,),
+        )
+        if cursor.fetchone() is None:
+            raise InvalidAccessToken("La cuenta de usuario ya no está disponible.")
+
+        cursor.execute(
+            """SELECT 1
+               FROM T_API_TOKENS
+               WHERE TOKEN_USUA_ID = %s AND TOKEN_REVOCADO IS NULL
+               LIMIT 1
+               FOR UPDATE""",
+            (user_id,),
+        )
+        if cursor.fetchone() is not None:
+            raise ActiveSessionError()
+
+        cursor.execute(
             "INSERT INTO T_API_TOKENS (TOKEN_JTI_HASH, TOKEN_USUA_ID) VALUES (%s, %s)",
             (_token_fingerprint(token_id), user_id),
         )
         current_app.mysql.connection.commit()
+    except ActiveSessionError:
+        current_app.mysql.connection.rollback()
+        raise
     except Exception:
         current_app.mysql.connection.rollback()
         raise

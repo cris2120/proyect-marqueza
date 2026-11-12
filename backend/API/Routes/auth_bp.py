@@ -8,6 +8,8 @@ from flask import Blueprint, g, jsonify, request, current_app
 from MySQLdb import Error as MySQLError
 
 from Services.auth_tokens import (
+    ActiveSessionError,
+    InvalidAccessToken,
     TokenConfigurationError,
     create_access_token,
     register_access_token,
@@ -114,6 +116,14 @@ def login():
 
     try:
         register_access_token(token_id, usuario["USUA_ID"])
+    except ActiveSessionError:
+        return jsonify({
+            "code": "SESSION_ACTIVE",
+            "message": "Este usuario ya tiene una sesión activa en otra pestaña.",
+            "usuario_id": usuario["USUA_ID"],
+        }), 409
+    except InvalidAccessToken:
+        return jsonify({"message": "La cuenta ya no está disponible."}), 401
     except MySQLError:
         current_app.logger.exception("No se pudo guardar el token de acceso.")
         return jsonify({"message": "No se pudo crear una sesión de acceso."}), 503

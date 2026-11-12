@@ -63,7 +63,11 @@ class MarquezaApi {
                 sessionStorage.removeItem("marqueza_sesion_activa");
                 window.location.replace(expiredSessionUrl);
             }
-            throw new Error(message);
+            const error = new Error(message);
+            error.code = payload?.code;
+            error.status = response.status;
+            error.usuarioId = payload?.usuario_id;
+            throw error;
         }
         return payload;
     }
@@ -145,4 +149,82 @@ class MarquezaApi {
 }
 
 window.MarquezaApi = MarquezaApi;
+
+const sessionConflictRequestKey = "marqueza_solicitud_cierre_sesion";
+const sessionConflictResponsePrefix = "marqueza_respuesta_cierre_sesion_";
+const handledSessionConflictRequests = new Set();
+
+function respondToSessionConflict(request) {
+    if (!request?.id || handledSessionConflictRequests.has(request.id)) return;
+    if (Date.now() - request.createdAt > 60000) return;
+
+    let session;
+    try {
+        session = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+    } catch (error) {
+        console.error("No fue posible leer la sesión activa.", error);
+        return;
+    }
+
+    if (
+        !session?.id
+        || String(session.id) !== String(request.usuarioId)
+        || sessionStorage.getItem("marqueza_sesion_activa") !== String(session.id)
+    ) return;
+
+    handledSessionConflictRequests.add(request.id);
+    const confirmLogout = window.Swal
+        ? window.Swal.fire({
+            icon: "warning",
+            title: "Usuario activo en otra pestaña",
+            text: "Se intentó iniciar sesión con tu usuario. ¿Quieres cerrar esta sesión para permitir el acceso en la otra pestaña?",
+            showCancelButton: true,
+            confirmButtonText: "Sí, cerrar sesión",
+            cancelButtonText: "No, mantener sesión"
+        }).then(result => result.isConfirmed)
+        : Promise.resolve(window.confirm(
+            "Se intentó iniciar sesión con tu usuario en otra pestaña. ¿Quieres cerrar esta sesión?"
+        ));
+
+    confirmLogout.then(async shouldLogout => {
+        if (!shouldLogout) {
+            localStorage.setItem(`${sessionConflictResponsePrefix}${request.id}`, JSON.stringify({ approved: false }));
+            return;
+        }
+
+        try {
+            await MarquezaApi.request("/auth/logout", { method: "POST" });
+            window.MarquezaAudit?.log({
+                action: "Cierre de sesión",
+                module: "Acceso",
+                detail: "La sesión se cerró desde otra pestaña a petición del usuario."
+            });
+            localStorage.removeItem("marqueza_usuario_sesion");
+            sessionStorage.removeItem("marqueza_sesion_activa");
+            localStorage.setItem(`${sessionConflictResponsePrefix}${request.id}`, JSON.stringify({ approved: true }));
+            const logoutUrl = new URL("../inicio_sesion/inicio_sesion.html", document.currentScript?.src || window.location.href);
+            window.location.replace(logoutUrl);
+        } catch (error) {
+            await MarquezaApi.notifyError(error, "No se pudo cerrar la sesión activa");
+            localStorage.setItem(`${sessionConflictResponsePrefix}${request.id}`, JSON.stringify({ approved: false }));
+        }
+    });
+}
+
+window.addEventListener("storage", event => {
+    if (event.key !== sessionConflictRequestKey || !event.newValue) return;
+    try {
+        respondToSessionConflict(JSON.parse(event.newValue));
+    } catch (error) {
+        console.error("No fue posible procesar la solicitud de cierre de sesión.", error);
+    }
+});
+
+try {
+    const pendingSessionConflict = JSON.parse(localStorage.getItem(sessionConflictRequestKey) || "null");
+    respondToSessionConflict(pendingSessionConflict);
+} catch (error) {
+    console.error("No fue posible leer la solicitud de cierre de sesión.", error);
+}
+
 void window.MarquezaAudit?.syncPending?.();
