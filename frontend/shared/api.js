@@ -42,6 +42,7 @@ class MarquezaApi {
             if (hasActiveSession && !isLoginPage && !suppressSessionRedirect) {
                 localStorage.removeItem("marqueza_usuario_sesion");
                 sessionStorage.removeItem("marqueza_sesion_activa");
+                window.MarquezaAudit?.releaseSession();
                 window.location.replace(loginUrl);
             }
             throw new Error("No se pudo conectar con la API. Comprueba que el backend esté iniciado.");
@@ -61,6 +62,7 @@ class MarquezaApi {
             if (response.status === 401 && sessionToken && !path.startsWith("/auth/")) {
                 localStorage.removeItem("marqueza_usuario_sesion");
                 sessionStorage.removeItem("marqueza_sesion_activa");
+                window.MarquezaAudit?.releaseSession();
                 window.location.replace(expiredSessionUrl);
             }
             throw new Error(message);

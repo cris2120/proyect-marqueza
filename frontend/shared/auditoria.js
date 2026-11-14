@@ -1,8 +1,87 @@
 (function () {
     const STORAGE_KEY = "marqueza_bitacora";
     const PENDING_KEY = "marqueza_bitacora_pendientes";
+    const SESSION_TAB_KEY = "marqueza_sesion_pestana_activa";
+    const TAB_ID_KEY = "marqueza_id_pestana";
+    const SESSION_HEARTBEAT_MS = 5000;
+    const SESSION_TIMEOUT_MS = 30000;
     const MAX_EVENTS = 500;
     let syncTask = null;
+    let sessionHeartbeat = null;
+    let tabId;
+
+    function getTabId() {
+        if (tabId) return tabId;
+        tabId = sessionStorage.getItem(TAB_ID_KEY);
+        if (!tabId) {
+            tabId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            sessionStorage.setItem(TAB_ID_KEY, tabId);
+        }
+        return tabId;
+    }
+
+    function readSessionTab() {
+        try {
+            const activeTab = JSON.parse(localStorage.getItem(SESSION_TAB_KEY) || "null");
+            return activeTab && typeof activeTab === "object" ? activeTab : null;
+        } catch {
+            return null;
+        }
+    }
+
+    function isSessionTabActive(activeTab, now = Date.now()) {
+        return Boolean(activeTab?.tabId && now - Number(activeTab.updatedAt) < SESSION_TIMEOUT_MS);
+    }
+
+    function writeSessionTab(sessionId) {
+        localStorage.setItem(SESSION_TAB_KEY, JSON.stringify({
+            tabId: getTabId(),
+            sessionId: sessionId === undefined ? readSessionTab()?.sessionId || null : String(sessionId),
+            updatedAt: Date.now()
+        }));
+    }
+
+    function startSessionHeartbeat(sessionId) {
+        clearInterval(sessionHeartbeat);
+        writeSessionTab(sessionId);
+        sessionHeartbeat = setInterval(() => {
+            const activeTab = readSessionTab();
+            if (activeTab?.tabId !== getTabId()) {
+                clearInterval(sessionHeartbeat);
+                sessionHeartbeat = null;
+                return;
+            }
+            writeSessionTab(sessionId);
+        }, SESSION_HEARTBEAT_MS);
+    }
+
+    function isActiveInAnotherTab() {
+        const activeTab = readSessionTab();
+        return isSessionTabActive(activeTab) && activeTab.tabId !== getTabId();
+    }
+
+    function showActiveElsewhereAlert() {
+        const message = "El usuario está activo en otra pestaña. Cierra la sesión allí antes de volver a ingresar.";
+        if (window.Swal) {
+            void window.Swal.fire({ icon: "warning", title: "Sesión activa", text: message });
+        } else {
+            window.alert(message);
+        }
+    }
+
+    function redirectToLoginForActiveSession() {
+        const loginUrl = new URL("../inicio_sesion/inicio_sesion.html?motivo=usuario_activo_otra_pestana", window.location.href);
+        window.location.replace(loginUrl);
+    }
+
+    function releaseSession({ pendingOnly = false } = {}) {
+        const activeTab = readSessionTab();
+        if (activeTab?.tabId === getTabId() && (!pendingOnly || !activeTab.sessionId)) {
+            localStorage.removeItem(SESSION_TAB_KEY);
+        }
+        clearInterval(sessionHeartbeat);
+        sessionHeartbeat = null;
+    }
 
     function getSession() {
         try {
@@ -189,13 +268,59 @@
     }
 
     function guardPage() {
-        if (isPublicAccessPage() || hasActiveSession()) return;
+        if (isPublicAccessPage()) return;
+        if (hasActiveSession()) {
+            if (isActiveInAnotherTab()) {
+                sessionStorage.removeItem("marqueza_sesion_activa");
+                redirectToLoginForActiveSession();
+                return;
+            }
+            const session = getSession();
+            startSessionHeartbeat(session.id);
+            return;
+        }
         const path = `${window.location.pathname}${window.location.search}`;
         log({ action: "Acceso denegado", module: "Acceso", entity: "Sesión requerida", detail: `Intento de acceso sin sesión a ${path}`, outcome: "denied" });
         window.location.replace("../inicio_sesion/inicio_sesion.html?motivo=sesion_requerida");
     }
 
-    window.MarquezaAudit = { log, read, loadAll, recordChange, guardPage, syncPending };
+    window.MarquezaAudit = {
+        log,
+        read,
+        loadAll,
+        recordChange,
+        guardPage,
+        syncPending,
+        reserveSession: async () => {
+            const reserve = () => {
+                const activeTab = readSessionTab();
+                if (isSessionTabActive(activeTab) && activeTab.tabId !== getTabId()) return false;
+                writeSessionTab(activeTab?.tabId === getTabId() ? activeTab.sessionId : null);
+                return true;
+            };
+            if (navigator.locks?.request) {
+                return navigator.locks.request("marqueza-session-reservation", reserve);
+            }
+            return reserve();
+        },
+        activateSession: (sessionId) => {
+            const activeTab = readSessionTab();
+            if (activeTab?.tabId !== getTabId()) return false;
+            sessionStorage.setItem("marqueza_sesion_activa", String(sessionId));
+            startSessionHeartbeat(sessionId);
+            return true;
+        },
+        releaseSession,
+        showActiveElsewhereAlert
+    };
+    window.addEventListener("storage", (event) => {
+        if (event.key !== SESSION_TAB_KEY || !hasActiveSession() || !isActiveInAnotherTab()) return;
+        localStorage.removeItem("marqueza_usuario_sesion");
+        sessionStorage.removeItem("marqueza_sesion_activa");
+        clearInterval(sessionHeartbeat);
+        sessionHeartbeat = null;
+        redirectToLoginForActiveSession();
+    });
     window.addEventListener("error", (event) => {
         const page = window.location.pathname.split("/").filter(Boolean).at(-2) || "Aplicación";
         log({ action: "Error de aplicación", module: moduleLabel(page), detail: String(event.message || "Error JavaScript").slice(0, 300), outcome: "error" });
