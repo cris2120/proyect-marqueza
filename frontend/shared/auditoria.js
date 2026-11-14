@@ -3,11 +3,14 @@
     const PENDING_KEY = "marqueza_bitacora_pendientes";
     const SESSION_TAB_KEY = "marqueza_sesion_pestana_activa";
     const TAB_ID_KEY = "marqueza_id_pestana";
+    const SESSION_TRANSFER_REQUEST_PREFIX = "marqueza_solicitud_cierre_sesion_";
+    const SESSION_TRANSFER_RESPONSE_PREFIX = "marqueza_respuesta_cierre_sesion_";
     const SESSION_HEARTBEAT_MS = 5000;
     const SESSION_TIMEOUT_MS = 30000;
     const MAX_EVENTS = 500;
     let syncTask = null;
     let sessionHeartbeat = null;
+    let sessionTransferPromptOpen = false;
     let tabId;
 
     function getTabId() {
@@ -33,10 +36,17 @@
         return Boolean(activeTab?.tabId && now - Number(activeTab.updatedAt) < SESSION_TIMEOUT_MS);
     }
 
+    function hasSessionId(activeTab) {
+        return Boolean(activeTab?.sessionId && activeTab.sessionId !== "null");
+    }
+
     function writeSessionTab(sessionId) {
+        const storedSessionId = sessionId === undefined
+            ? readSessionTab()?.sessionId || null
+            : sessionId === null ? null : String(sessionId);
         localStorage.setItem(SESSION_TAB_KEY, JSON.stringify({
             tabId: getTabId(),
-            sessionId: sessionId === undefined ? readSessionTab()?.sessionId || null : String(sessionId),
+            sessionId: storedSessionId,
             updatedAt: Date.now()
         }));
     }
@@ -76,11 +86,111 @@
 
     function releaseSession({ pendingOnly = false } = {}) {
         const activeTab = readSessionTab();
-        if (activeTab?.tabId === getTabId() && (!pendingOnly || !activeTab.sessionId)) {
+        if (activeTab?.tabId === getTabId() && (!pendingOnly || !hasSessionId(activeTab))) {
             localStorage.removeItem(SESSION_TAB_KEY);
         }
         clearInterval(sessionHeartbeat);
         sessionHeartbeat = null;
+    }
+
+    function transferResponseKey(requestId) {
+        return `${SESSION_TRANSFER_RESPONSE_PREFIX}${requestId}`;
+    }
+
+    function respondToSessionTransfer(requestId, approved) {
+        localStorage.setItem(transferResponseKey(requestId), JSON.stringify({ requestId, approved }));
+    }
+
+    async function confirmSessionTransfer() {
+        const message = "Estás intentando ingresar desde otra pestaña. ¿Quieres cerrar sesión?";
+        if (!window.Swal) return window.confirm(message);
+        const result = await window.Swal.fire({
+            icon: "warning",
+            title: "Ingreso desde otra pestaña",
+            text: message,
+            showCancelButton: true,
+            confirmButtonText: "Sí, cerrar sesión",
+            cancelButtonText: "No, mantener sesión",
+            reverseButtons: true
+        });
+        return result.isConfirmed;
+    }
+
+    async function handleSessionTransferRequest(requestId) {
+        const activeTab = readSessionTab();
+        const session = getSession();
+        if (activeTab?.tabId !== getTabId()) return;
+        if (!hasActiveSession() || activeTab.sessionId !== String(session?.id)) {
+            respondToSessionTransfer(requestId, false);
+            return;
+        }
+        if (sessionTransferPromptOpen) {
+            respondToSessionTransfer(requestId, false);
+            return;
+        }
+
+        sessionTransferPromptOpen = true;
+        try {
+            if (!await confirmSessionTransfer()) {
+                respondToSessionTransfer(requestId, false);
+                return;
+            }
+            if (!localStorage.getItem(`${SESSION_TRANSFER_REQUEST_PREFIX}${requestId}`)) {
+                respondToSessionTransfer(requestId, false);
+                return;
+            }
+            const currentSessionTab = readSessionTab();
+            const currentSession = getSession();
+            if (currentSessionTab?.tabId !== getTabId() || currentSessionTab.sessionId !== String(currentSession?.id)) {
+                respondToSessionTransfer(requestId, false);
+                return;
+            }
+            if (window.MarquezaApi?.sessionToken()) {
+                await window.MarquezaApi.request("/auth/logout", { method: "POST" });
+            }
+            releaseSession();
+            localStorage.removeItem("marqueza_usuario_sesion");
+            sessionStorage.removeItem("marqueza_sesion_activa");
+            respondToSessionTransfer(requestId, true);
+            window.location.replace("../inicio_sesion/inicio_sesion.html");
+        } catch (error) {
+            await window.MarquezaApi?.notifyError(error, "No se pudo cerrar la sesión");
+            respondToSessionTransfer(requestId, false);
+        } finally {
+            sessionTransferPromptOpen = false;
+        }
+    }
+
+    function requestSessionTransfer() {
+        const requestId = `${getTabId()}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const requestKey = `${SESSION_TRANSFER_REQUEST_PREFIX}${requestId}`;
+        const responseKey = transferResponseKey(requestId);
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => finish(false), SESSION_TIMEOUT_MS * 2);
+            const onPageHide = () => finish(false);
+            const onStorage = (event) => {
+                if (event.key !== responseKey || !event.newValue) return;
+                let response;
+                try {
+                    response = JSON.parse(event.newValue);
+                } catch (error) {
+                    console.error("No se pudo leer la respuesta de cierre de sesión.", error);
+                    return;
+                }
+                if (response?.requestId === requestId) finish(response.approved === true);
+            };
+            const finish = (approved) => {
+                clearTimeout(timeout);
+                window.removeEventListener("storage", onStorage);
+                window.removeEventListener("pagehide", onPageHide);
+                localStorage.removeItem(requestKey);
+                localStorage.removeItem(responseKey);
+                resolve(approved);
+            };
+            window.addEventListener("storage", onStorage);
+            window.addEventListener("pagehide", onPageHide);
+            localStorage.setItem(requestKey, JSON.stringify({ requestId, createdAt: Date.now() }));
+        });
     }
 
     function getSession() {
@@ -298,10 +408,15 @@
                 writeSessionTab(activeTab?.tabId === getTabId() ? activeTab.sessionId : null);
                 return true;
             };
-            if (navigator.locks?.request) {
-                return navigator.locks.request("marqueza-session-reservation", reserve);
-            }
-            return reserve();
+            const tryReserve = () => navigator.locks?.request
+                ? navigator.locks.request("marqueza-session-reservation", reserve)
+                : Promise.resolve(reserve());
+            if (await tryReserve()) return true;
+
+            const activeTab = readSessionTab();
+            if (!isSessionTabActive(activeTab) || activeTab.tabId === getTabId()) return tryReserve();
+            if (!hasSessionId(activeTab) || !await requestSessionTransfer()) return false;
+            return tryReserve();
         },
         activateSession: (sessionId) => {
             const activeTab = readSessionTab();
@@ -320,6 +435,17 @@
         clearInterval(sessionHeartbeat);
         sessionHeartbeat = null;
         redirectToLoginForActiveSession();
+    });
+    window.addEventListener("storage", (event) => {
+        if (!event.key?.startsWith(SESSION_TRANSFER_REQUEST_PREFIX) || !event.newValue) return;
+        try {
+            const request = JSON.parse(event.newValue);
+            if (request?.requestId && event.key === `${SESSION_TRANSFER_REQUEST_PREFIX}${request.requestId}`) {
+                void handleSessionTransferRequest(request.requestId);
+            }
+        } catch (error) {
+            console.error("No se pudo leer la solicitud de cierre de sesión.", error);
+        }
     });
     window.addEventListener("error", (event) => {
         const page = window.location.pathname.split("/").filter(Boolean).at(-2) || "Aplicación";
