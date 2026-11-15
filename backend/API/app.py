@@ -1,7 +1,7 @@
 import os
 
 from flask import Flask, g, jsonify, redirect, request, send_from_directory
-from MySQLdb import Error as MySQLError
+from MySQLdb import Error as MySQLError 
 
 from config import Config
 from flask_mysqldb import MySQL
