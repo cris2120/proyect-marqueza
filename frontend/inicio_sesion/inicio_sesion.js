@@ -29,39 +29,75 @@ class LoginForm {
             return Swal.fire({ icon: "warning", title: "Campos incompletos", text: "Por favor completa todos los campos." });
         }
 
-        if (!await window.MarquezaAudit.reserveSession()) {
+        const preflightPromise = window.MarquezaAudit.preflightSession(username)
+            .catch(error => ({ error }));
+        let result;
+        try {
+            result = await window.MarquezaApi.request("/auth/login", {
+                method: "POST",
+                body: JSON.stringify({ usuario: username, contrasena: password })
+            });
+        } catch (error) {
+            window.MarquezaAudit?.log({ action: "Inicio de sesión rechazado", module: "Acceso", entity: username, detail: error.message, outcome: "denied", actor: username });
+            return window.MarquezaApi.notifyError(error, "No se pudo iniciar sesión");
+        }
+
+        const user = result.usuario;
+        const preflight = await preflightPromise;
+        if (preflight?.error) {
+            await this.revokeLoginToken(result.token);
+            return window.MarquezaApi.notifyError(preflight.error, "No se pudo validar la sesión en otra pestaña");
+        }
+        if (preflight?.denied) {
+            await this.revokeLoginToken(result.token);
             window.MarquezaAudit.showActiveElsewhereAlert();
             return;
         }
 
-        let user;
+        let reserved = false;
         try {
-            const result = await window.MarquezaApi.request("/auth/login", {
-                method: "POST",
-                body: JSON.stringify({ usuario: username, contrasena: password })
-            });
-            user = result.usuario;
-            if (!window.MarquezaAudit.activateSession(user.id)) {
-                try {
-                    await window.MarquezaApi.request("/auth/logout", {
-                        method: "POST",
-                        headers: { Authorization: `Bearer ${result.token}` },
-                        suppressSessionRedirect: true
-                    });
-                } catch (error) {
-                    await window.MarquezaApi.notifyError(error, "No se pudo cerrar la sesión duplicada");
-                }
+            reserved = await window.MarquezaAudit.reserveSession(user.id, preflight);
+        } catch (error) {
+            await this.revokeLoginToken(result.token);
+            return window.MarquezaApi.notifyError(error, "No se pudo validar la sesión en esta pestaña");
+        }
+        if (!reserved) {
+            await this.revokeLoginToken(result.token);
+            window.MarquezaAudit.showActiveElsewhereAlert();
+            return;
+        }
+
+        try {
+            sessionStorage.setItem("marqueza_usuario_sesion", JSON.stringify({ ...user, token: result.token }));
+            if (!window.MarquezaAudit.activateSession(user)) {
+                sessionStorage.removeItem("marqueza_usuario_sesion");
+                sessionStorage.removeItem("marqueza_sesion_activa");
+                window.MarquezaAudit.releaseSession({ sessionId: user.id });
+                await this.revokeLoginToken(result.token);
                 window.MarquezaAudit.showActiveElsewhereAlert();
                 return;
             }
-            localStorage.setItem("marqueza_usuario_sesion", JSON.stringify({ ...user, token: result.token }));
             window.MarquezaAudit?.log({ action: "Inicio de sesión", module: "Acceso", detail: "Inicio de sesión autorizado.", actor: user.nombre, email: user.correo, role: user.rol });
         } catch (error) {
-            window.MarquezaAudit.releaseSession({ pendingOnly: true });
-            window.MarquezaAudit?.log({ action: "Inicio de sesión rechazado", module: "Acceso", entity: username, detail: error.message, outcome: "denied", actor: username });
-            return window.MarquezaApi.notifyError(error, "No se pudo iniciar sesión");
+            sessionStorage.removeItem("marqueza_usuario_sesion");
+            sessionStorage.removeItem("marqueza_sesion_activa");
+            window.MarquezaAudit.releaseSession({ sessionId: user.id });
+            await this.revokeLoginToken(result.token);
+            return window.MarquezaApi.notifyError(error, "No se pudo guardar la sesión");
         }
         window.location.replace("../inicio/inicio.html");
+    }
+
+    async revokeLoginToken(token) {
+        try {
+            await window.MarquezaApi.request("/auth/logout", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                suppressSessionRedirect: true
+            });
+        } catch (error) {
+            await window.MarquezaApi.notifyError(error, "No se pudo cerrar la sesión duplicada");
+        }
     }
 }
 

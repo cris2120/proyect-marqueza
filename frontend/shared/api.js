@@ -33,16 +33,16 @@ class MarquezaApi {
         } catch {
             let session = null;
             try {
-                session = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+                session = JSON.parse(sessionStorage.getItem("marqueza_usuario_sesion") || "null");
             } catch {
                 session = null;
             }
             const hasActiveSession = session?.id && sessionStorage.getItem("marqueza_sesion_activa") === String(session.id);
             const isLoginPage = window.location.pathname.endsWith("/inicio_sesion/inicio_sesion.html");
             if (hasActiveSession && !isLoginPage && !suppressSessionRedirect) {
-                localStorage.removeItem("marqueza_usuario_sesion");
+                sessionStorage.removeItem("marqueza_usuario_sesion");
                 sessionStorage.removeItem("marqueza_sesion_activa");
-                window.MarquezaAudit?.releaseSession();
+                window.MarquezaAudit?.releaseSession({ sessionId: session.id });
                 window.location.replace(loginUrl);
             }
             throw new Error("No se pudo conectar con la API. Comprueba que el backend esté iniciado.");
@@ -60,9 +60,10 @@ class MarquezaApi {
         if (!response.ok) {
             const message = payload?.mensaje || payload?.message || `Error HTTP ${response.status}`;
             if (response.status === 401 && sessionToken && !path.startsWith("/auth/")) {
-                localStorage.removeItem("marqueza_usuario_sesion");
+                const session = JSON.parse(sessionStorage.getItem("marqueza_usuario_sesion") || "null");
+                sessionStorage.removeItem("marqueza_usuario_sesion");
                 sessionStorage.removeItem("marqueza_sesion_activa");
-                window.MarquezaAudit?.releaseSession();
+                window.MarquezaAudit?.releaseSession({ sessionId: session?.id });
                 window.location.replace(expiredSessionUrl);
             }
             throw new Error(message);
@@ -71,7 +72,22 @@ class MarquezaApi {
     }
 
     static sessionToken() {
-        const storedSession = localStorage.getItem("marqueza_usuario_sesion");
+        let storedSession = sessionStorage.getItem("marqueza_usuario_sesion");
+        if (!storedSession) {
+            const legacySession = localStorage.getItem("marqueza_usuario_sesion");
+            if (legacySession) {
+                try {
+                    const session = JSON.parse(legacySession);
+                    if (session?.id && sessionStorage.getItem("marqueza_sesion_activa") === String(session.id)) {
+                        storedSession = legacySession;
+                        sessionStorage.setItem("marqueza_usuario_sesion", legacySession);
+                    }
+                } catch (error) {
+                    console.error("No fue posible leer la sesión anterior almacenada.", error);
+                    throw new Error("No fue posible leer la sesión almacenada. Cierra sesión y vuelve a ingresar.");
+                }
+            }
+        }
         if (!storedSession) return null;
 
         let session;

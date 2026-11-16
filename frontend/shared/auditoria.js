@@ -1,7 +1,7 @@
 (function () {
     const STORAGE_KEY = "marqueza_bitacora";
     const PENDING_KEY = "marqueza_bitacora_pendientes";
-    const SESSION_TAB_KEY = "marqueza_sesion_pestana_activa";
+    const SESSION_TAB_PREFIX = "marqueza_sesion_pestana_activa_";
     const TAB_ID_KEY = "marqueza_id_pestana";
     const SESSION_TRANSFER_REQUEST_PREFIX = "marqueza_solicitud_cierre_sesion_";
     const SESSION_TRANSFER_RESPONSE_PREFIX = "marqueza_respuesta_cierre_sesion_";
@@ -12,6 +12,7 @@
     let sessionHeartbeat = null;
     let sessionTransferPromptOpen = false;
     let tabId;
+    const approvedTransfers = new Map();
 
     function getTabId() {
         if (tabId) return tabId;
@@ -23,9 +24,13 @@
         return tabId;
     }
 
-    function readSessionTab() {
+    function sessionTabKey(sessionId) {
+        return `${SESSION_TAB_PREFIX}${encodeURIComponent(String(sessionId))}`;
+    }
+
+    function readSessionTab(sessionId) {
         try {
-            const activeTab = JSON.parse(localStorage.getItem(SESSION_TAB_KEY) || "null");
+            const activeTab = JSON.parse(localStorage.getItem(sessionTabKey(sessionId)) || "null");
             return activeTab && typeof activeTab === "object" ? activeTab : null;
         } catch {
             return null;
@@ -36,37 +41,40 @@
         return Boolean(activeTab?.tabId && now - Number(activeTab.updatedAt) < SESSION_TIMEOUT_MS);
     }
 
-    function hasSessionId(activeTab) {
-        return Boolean(activeTab?.sessionId && activeTab.sessionId !== "null");
+    function normalizeIdentifier(value) {
+        return String(value || "").trim().toLocaleLowerCase("es");
     }
 
-    function writeSessionTab(sessionId) {
-        const storedSessionId = sessionId === undefined
-            ? readSessionTab()?.sessionId || null
-            : sessionId === null ? null : String(sessionId);
-        localStorage.setItem(SESSION_TAB_KEY, JSON.stringify({
+    function writeSessionTab(sessionId, identifiers = []) {
+        const normalizedSessionId = String(sessionId);
+        localStorage.setItem(sessionTabKey(normalizedSessionId), JSON.stringify({
             tabId: getTabId(),
-            sessionId: storedSessionId,
+            sessionId: normalizedSessionId,
+            identifiers: [...new Set(identifiers.map(normalizeIdentifier).filter(Boolean))],
             updatedAt: Date.now()
         }));
     }
 
-    function startSessionHeartbeat(sessionId) {
+    function startSessionHeartbeat(session) {
         clearInterval(sessionHeartbeat);
-        writeSessionTab(sessionId);
+        const sessionId = session?.id ?? session;
+        const identifiers = typeof session === "object"
+            ? [session.nombre, session.correo]
+            : [];
+        writeSessionTab(sessionId, identifiers);
         sessionHeartbeat = setInterval(() => {
-            const activeTab = readSessionTab();
+            const activeTab = readSessionTab(sessionId);
             if (activeTab?.tabId !== getTabId()) {
                 clearInterval(sessionHeartbeat);
                 sessionHeartbeat = null;
                 return;
             }
-            writeSessionTab(sessionId);
+            writeSessionTab(sessionId, identifiers);
         }, SESSION_HEARTBEAT_MS);
     }
 
-    function isActiveInAnotherTab() {
-        const activeTab = readSessionTab();
+    function isActiveInAnotherTab(sessionId) {
+        const activeTab = readSessionTab(sessionId);
         return isSessionTabActive(activeTab) && activeTab.tabId !== getTabId();
     }
 
@@ -84,10 +92,15 @@
         window.location.replace(loginUrl);
     }
 
-    function releaseSession({ pendingOnly = false } = {}) {
-        const activeTab = readSessionTab();
-        if (activeTab?.tabId === getTabId() && (!pendingOnly || !hasSessionId(activeTab))) {
-            localStorage.removeItem(SESSION_TAB_KEY);
+    function releaseSession({ sessionId = getSession()?.id } = {}) {
+        if (sessionId === undefined || sessionId === null) {
+            clearInterval(sessionHeartbeat);
+            sessionHeartbeat = null;
+            return;
+        }
+        const activeTab = readSessionTab(sessionId);
+        if (activeTab?.tabId === getTabId()) {
+            localStorage.removeItem(sessionTabKey(sessionId));
         }
         clearInterval(sessionHeartbeat);
         sessionHeartbeat = null;
@@ -97,12 +110,12 @@
         return `${SESSION_TRANSFER_RESPONSE_PREFIX}${requestId}`;
     }
 
-    function respondToSessionTransfer(requestId, approved) {
-        localStorage.setItem(transferResponseKey(requestId), JSON.stringify({ requestId, approved }));
+    function respondToSessionTransfer(requestId, approved, approvalId = null) {
+        localStorage.setItem(transferResponseKey(requestId), JSON.stringify({ requestId, approved, approvalId }));
     }
 
     async function confirmSessionTransfer() {
-        const message = "Estás intentando ingresar desde otra pestaña. ¿Quieres cerrar sesión?";
+        const message = "Estás intentando ingresar desde otra pestaña. ¿Quieres cerrar sesión? Solo se cerrará si la contraseña es válida.";
         if (!window.Swal) return window.confirm(message);
         const result = await window.Swal.fire({
             icon: "warning",
@@ -116,16 +129,90 @@
         return result.isConfirmed;
     }
 
+    function findSessionByIdentifier(identifier) {
+        const normalizedIdentifier = normalizeIdentifier(identifier);
+        if (!normalizedIdentifier) return null;
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = localStorage.key(index);
+            if (!key?.startsWith(SESSION_TAB_PREFIX)) continue;
+            try {
+                const activeTab = JSON.parse(localStorage.getItem(key) || "null");
+                if (isSessionTabActive(activeTab) && activeTab.identifiers?.includes(normalizedIdentifier)) {
+                    return activeTab;
+                }
+            } catch (error) {
+                console.error("No se pudo leer una sesión activa de otra pestaña.", error);
+            }
+        }
+        return null;
+    }
+
+    async function preflightSession(identifier) {
+        const activeTab = findSessionByIdentifier(identifier);
+        if (!activeTab || activeTab.tabId === getTabId()) return null;
+        const response = await requestSessionTransfer(activeTab.sessionId, "prepare");
+        return response.approved
+            ? { sessionId: String(activeTab.sessionId), approvalId: response.approvalId }
+            : { denied: true };
+    }
+
+    async function closeSessionForTransfer(requestId, sessionId) {
+        const requestKey = `${SESSION_TRANSFER_REQUEST_PREFIX}${requestId}`;
+        if (!localStorage.getItem(requestKey)) {
+            respondToSessionTransfer(requestId, false);
+            return;
+        }
+        const currentSessionTab = readSessionTab(sessionId);
+        const currentSession = getSession();
+        if (currentSessionTab?.tabId !== getTabId() || currentSessionTab.sessionId !== String(currentSession?.id) || currentSessionTab.sessionId !== String(sessionId)) {
+            respondToSessionTransfer(requestId, false);
+            return;
+        }
+        if (window.MarquezaApi?.sessionToken()) {
+            await window.MarquezaApi.request("/auth/logout", { method: "POST" });
+        }
+        releaseSession({ sessionId });
+        sessionStorage.removeItem("marqueza_usuario_sesion");
+        sessionStorage.removeItem("marqueza_sesion_activa");
+        respondToSessionTransfer(requestId, true);
+        window.location.replace("../inicio_sesion/inicio_sesion.html");
+    }
+
     async function handleSessionTransferRequest(requestId) {
-        const activeTab = readSessionTab();
+        const requestKey = `${SESSION_TRANSFER_REQUEST_PREFIX}${requestId}`;
+        let request;
+        try {
+            request = JSON.parse(localStorage.getItem(requestKey) || "null");
+        } catch (error) {
+            console.error("No se pudo leer la solicitud de cierre de sesión.", error);
+            return;
+        }
+        if (!request?.sessionId) return;
+        const activeTab = readSessionTab(request.sessionId);
         const session = getSession();
         if (activeTab?.tabId !== getTabId()) return;
-        if (!hasActiveSession() || activeTab.sessionId !== String(session?.id)) {
+        if (!hasActiveSession() || activeTab.sessionId !== String(session?.id) || activeTab.sessionId !== String(request.sessionId)) {
             respondToSessionTransfer(requestId, false);
             return;
         }
         if (sessionTransferPromptOpen) {
             respondToSessionTransfer(requestId, false);
+            return;
+        }
+
+        if (request.action === "commit") {
+            const approval = approvedTransfers.get(request.approvalId);
+            if (!approval || approval.sessionId !== String(request.sessionId) || approval.expiresAt < Date.now()) {
+                respondToSessionTransfer(requestId, false);
+                return;
+            }
+            approvedTransfers.delete(request.approvalId);
+            try {
+                await closeSessionForTransfer(requestId, request.sessionId);
+            } catch (error) {
+                await window.MarquezaApi?.notifyError(error, "No se pudo cerrar la sesión");
+                respondToSessionTransfer(requestId, false);
+            }
             return;
         }
 
@@ -135,24 +222,24 @@
                 respondToSessionTransfer(requestId, false);
                 return;
             }
-            if (!localStorage.getItem(`${SESSION_TRANSFER_REQUEST_PREFIX}${requestId}`)) {
+            if (!localStorage.getItem(requestKey)) {
                 respondToSessionTransfer(requestId, false);
                 return;
             }
-            const currentSessionTab = readSessionTab();
-            const currentSession = getSession();
-            if (currentSessionTab?.tabId !== getTabId() || currentSessionTab.sessionId !== String(currentSession?.id)) {
+            const confirmedSessionTab = readSessionTab(request.sessionId);
+            const confirmedSession = getSession();
+            if (confirmedSessionTab?.tabId !== getTabId() || confirmedSessionTab.sessionId !== String(confirmedSession?.id)) {
                 respondToSessionTransfer(requestId, false);
                 return;
             }
-            if (window.MarquezaApi?.sessionToken()) {
-                await window.MarquezaApi.request("/auth/logout", { method: "POST" });
+            if (request.action === "prepare") {
+                const approval = { sessionId: String(request.sessionId), expiresAt: Date.now() + SESSION_TIMEOUT_MS * 2 };
+                approvedTransfers.set(requestId, approval);
+                setTimeout(() => approvedTransfers.delete(requestId), SESSION_TIMEOUT_MS * 2);
+                respondToSessionTransfer(requestId, true, requestId);
+            } else {
+                await closeSessionForTransfer(requestId, request.sessionId);
             }
-            releaseSession();
-            localStorage.removeItem("marqueza_usuario_sesion");
-            sessionStorage.removeItem("marqueza_sesion_activa");
-            respondToSessionTransfer(requestId, true);
-            window.location.replace("../inicio_sesion/inicio_sesion.html");
         } catch (error) {
             await window.MarquezaApi?.notifyError(error, "No se pudo cerrar la sesión");
             respondToSessionTransfer(requestId, false);
@@ -161,13 +248,13 @@
         }
     }
 
-    function requestSessionTransfer() {
+    function requestSessionTransfer(sessionId, action = "confirm", approvalId = null) {
         const requestId = `${getTabId()}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const requestKey = `${SESSION_TRANSFER_REQUEST_PREFIX}${requestId}`;
         const responseKey = transferResponseKey(requestId);
         return new Promise((resolve) => {
-            const timeout = setTimeout(() => finish(false), SESSION_TIMEOUT_MS * 2);
-            const onPageHide = () => finish(false);
+            const timeout = setTimeout(() => finish({ approved: false }), SESSION_TIMEOUT_MS * 2);
+            const onPageHide = () => finish({ approved: false });
             const onStorage = (event) => {
                 if (event.key !== responseKey || !event.newValue) return;
                 let response;
@@ -177,25 +264,32 @@
                     console.error("No se pudo leer la respuesta de cierre de sesión.", error);
                     return;
                 }
-                if (response?.requestId === requestId) finish(response.approved === true);
+                if (response?.requestId === requestId) finish(response);
             };
-            const finish = (approved) => {
+            const finish = (response) => {
                 clearTimeout(timeout);
                 window.removeEventListener("storage", onStorage);
                 window.removeEventListener("pagehide", onPageHide);
                 localStorage.removeItem(requestKey);
                 localStorage.removeItem(responseKey);
-                resolve(approved);
+                resolve(response);
             };
             window.addEventListener("storage", onStorage);
             window.addEventListener("pagehide", onPageHide);
-            localStorage.setItem(requestKey, JSON.stringify({ requestId, createdAt: Date.now() }));
+            localStorage.setItem(requestKey, JSON.stringify({ requestId, sessionId: String(sessionId), action, approvalId, createdAt: Date.now() }));
         });
     }
 
     function getSession() {
         try {
-            const session = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+            let session = JSON.parse(sessionStorage.getItem("marqueza_usuario_sesion") || "null");
+            if (!session) {
+                const legacySession = JSON.parse(localStorage.getItem("marqueza_usuario_sesion") || "null");
+                if (legacySession?.id && sessionStorage.getItem("marqueza_sesion_activa") === String(legacySession.id)) {
+                    session = legacySession;
+                    sessionStorage.setItem("marqueza_usuario_sesion", JSON.stringify(session));
+                }
+            }
             return session && typeof session === "object" ? session : null;
         } catch {
             return null;
@@ -380,13 +474,14 @@
     function guardPage() {
         if (isPublicAccessPage()) return;
         if (hasActiveSession()) {
-            if (isActiveInAnotherTab()) {
+            const session = getSession();
+            if (isActiveInAnotherTab(session.id)) {
+                sessionStorage.removeItem("marqueza_usuario_sesion");
                 sessionStorage.removeItem("marqueza_sesion_activa");
                 redirectToLoginForActiveSession();
                 return;
             }
-            const session = getSession();
-            startSessionHeartbeat(session.id);
+            startSessionHeartbeat(session);
             return;
         }
         const path = `${window.location.pathname}${window.location.search}`;
@@ -401,36 +496,44 @@
         recordChange,
         guardPage,
         syncPending,
-        reserveSession: async () => {
+        preflightSession,
+        reserveSession: async (sessionId, transferApproval = null) => {
+            const normalizedSessionId = String(sessionId);
             const reserve = () => {
-                const activeTab = readSessionTab();
+                const activeTab = readSessionTab(normalizedSessionId);
                 if (isSessionTabActive(activeTab) && activeTab.tabId !== getTabId()) return false;
-                writeSessionTab(activeTab?.tabId === getTabId() ? activeTab.sessionId : null);
+                writeSessionTab(normalizedSessionId);
                 return true;
             };
             const tryReserve = () => navigator.locks?.request
-                ? navigator.locks.request("marqueza-session-reservation", reserve)
+                ? navigator.locks.request(`marqueza-session-reservation-${encodeURIComponent(normalizedSessionId)}`, reserve)
                 : Promise.resolve(reserve());
             if (await tryReserve()) return true;
 
-            const activeTab = readSessionTab();
+            const activeTab = readSessionTab(normalizedSessionId);
             if (!isSessionTabActive(activeTab) || activeTab.tabId === getTabId()) return tryReserve();
-            if (!hasSessionId(activeTab) || !await requestSessionTransfer()) return false;
+            const response = transferApproval?.sessionId === normalizedSessionId
+                ? await requestSessionTransfer(normalizedSessionId, "commit", transferApproval.approvalId)
+                : await requestSessionTransfer(normalizedSessionId);
+            if (!response.approved) return false;
             return tryReserve();
         },
-        activateSession: (sessionId) => {
-            const activeTab = readSessionTab();
+        activateSession: (session) => {
+            const sessionId = session?.id ?? session;
+            const activeTab = readSessionTab(sessionId);
             if (activeTab?.tabId !== getTabId()) return false;
             sessionStorage.setItem("marqueza_sesion_activa", String(sessionId));
-            startSessionHeartbeat(sessionId);
+            startSessionHeartbeat(session);
             return true;
         },
         releaseSession,
         showActiveElsewhereAlert
     };
     window.addEventListener("storage", (event) => {
-        if (event.key !== SESSION_TAB_KEY || !hasActiveSession() || !isActiveInAnotherTab()) return;
-        localStorage.removeItem("marqueza_usuario_sesion");
+        if (!event.key?.startsWith(SESSION_TAB_PREFIX) || !hasActiveSession()) return;
+        const session = getSession();
+        if (event.key !== sessionTabKey(session.id) || !isActiveInAnotherTab(session.id)) return;
+        sessionStorage.removeItem("marqueza_usuario_sesion");
         sessionStorage.removeItem("marqueza_sesion_activa");
         clearInterval(sessionHeartbeat);
         sessionHeartbeat = null;
@@ -440,7 +543,7 @@
         if (!event.key?.startsWith(SESSION_TRANSFER_REQUEST_PREFIX) || !event.newValue) return;
         try {
             const request = JSON.parse(event.newValue);
-            if (request?.requestId && event.key === `${SESSION_TRANSFER_REQUEST_PREFIX}${request.requestId}`) {
+            if (request?.requestId && request?.sessionId && event.key === `${SESSION_TRANSFER_REQUEST_PREFIX}${request.requestId}`) {
                 void handleSessionTransferRequest(request.requestId);
             }
         } catch (error) {
