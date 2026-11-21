@@ -1232,6 +1232,33 @@ body.dark .audit-stat,
 body.dark .audit-toolbar,
 body.dark .audit-table-section,
 body.dark .audit-note { border-color: var(--help-border); background: #222d3d; }
+body.dark.module-actividad [data-audit-view] .audit-table-section,
+body.dark.module-ayuda [data-audit-view] .audit-table-section {
+    border: 1px solid #344257 !important;
+    border-radius: 14px !important;
+    background: #222d3d !important;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22) !important;
+}
+body.dark.module-actividad [data-audit-view] .audit-table,
+body.dark.module-ayuda [data-audit-view] .audit-table {
+    border-collapse: collapse !important;
+}
+body.dark.module-actividad [data-audit-view] .audit-table th,
+body.dark.module-ayuda [data-audit-view] .audit-table th {
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid #46546b;
+}
+body.dark.module-actividad [data-audit-view] .audit-table td,
+body.dark.module-ayuda [data-audit-view] .audit-table td {
+    border-right: 1px solid rgba(237, 245, 248, 0.055);
+    border-bottom: 1px solid #344257;
+}
+body.dark.module-actividad [data-audit-view] .audit-table th:last-child,
+body.dark.module-actividad [data-audit-view] .audit-table td:last-child,
+body.dark.module-ayuda [data-audit-view] .audit-table th:last-child,
+body.dark.module-ayuda [data-audit-view] .audit-table td:last-child {
+    border-right: 0;
+}
 body.dark .audit-search input,
 body.dark .audit-toolbar select,
 body.dark .audit-icon-button,

@@ -575,9 +575,9 @@ body.dark[data-audit-view] .audit-search input::placeholder {
 [data-audit-view] .audit-table-section {
     overflow: hidden;
     border: 1px solid var(--audit-border);
-    border-radius: 18px;
+    border-radius: 14px;
     background: var(--audit-surface);
-    box-shadow: 0 12px 30px rgba(18, 48, 74, 0.07);
+    box-shadow: var(--marqueza-shadow, 0 14px 34px rgba(18, 48, 74, 0.12));
 }
 
 [data-audit-view] .audit-table-scroll {
@@ -588,7 +588,8 @@ body.dark[data-audit-view] .audit-search input::placeholder {
 
 [data-audit-view] .audit-table {
     width: 100%;
-    border-collapse: separate;
+    min-width: 760px;
+    border-collapse: collapse;
     border-spacing: 0;
     text-align: left;
 }
