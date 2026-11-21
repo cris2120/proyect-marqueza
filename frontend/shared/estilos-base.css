@@ -410,6 +410,53 @@ body.dark .cont_tabla td * {
     color: #edf5f8 !important;
 }
 
+/* Campos de búsqueda y formularios en modo oscuro */
+body.dark .input-shell,
+body.dark .audit-search {
+    border-color: #46546b !important;
+    background: #182231 !important;
+}
+
+body.dark input[type="text"],
+body.dark input[type="search"],
+body.dark input[type="password"],
+body.dark input[type="email"],
+body.dark input[type="tel"],
+body.dark input[type="number"],
+body.dark input[type="date"],
+body.dark textarea,
+body.dark select,
+body.dark .cont_busqueda input,
+body.dark .search-field input,
+body.dark .campo_busqueda input,
+body.dark .help-search input,
+body.dark .audit-search input,
+body.dark .quote-tools input,
+body.dark .quote-tools select,
+body.dark .input-shell input {
+    border-color: #46546b;
+    background: #182231;
+    color: #edf5f8;
+    color-scheme: dark;
+}
+
+body.dark input::placeholder,
+body.dark textarea::placeholder,
+body.dark .cont_busqueda input::placeholder,
+body.dark .search-field input::placeholder,
+body.dark .campo_busqueda input::placeholder,
+body.dark .help-search input::placeholder,
+body.dark .audit-search input::placeholder,
+body.dark .quote-tools input::placeholder,
+body.dark .input-shell input::placeholder {
+    color: #9fb0bd;
+    opacity: 1;
+}
+
+body.dark input[type="search"]::-webkit-search-cancel-button {
+    filter: invert(1) brightness(1.8);
+}
+
 body.dark .cont_tabla th {
     color: #ffffff !important;
 }

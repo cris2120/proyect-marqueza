@@ -460,6 +460,8 @@ body.dark.pagina-login .titulo { color: #edf5f8; }
 body.dark.pagina-login .input-shell { border-color: #46546b; background: #182231; }
 body.dark.pagina-login .input-shell:focus-within { border-color: #6d8799; background: #1f303d; box-shadow: none; }
 body.dark.pagina-login .input-shell input { color: #edf5f8; }
+body.dark.pagina-login .input-shell input::placeholder { color: #9fb0bd; opacity: 1; }
+body.dark.pagina-login .input-shell > i { color: #9fb0bd; }
 body.dark.pagina-login .input-shell .password-toggle { color: #b9c9d4; }
 body.dark.pagina-login .options, body.dark.pagina-login .texto, body.dark.pagina-login .subtitulo { color: #b9c2ce; }
 
