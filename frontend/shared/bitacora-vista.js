@@ -149,31 +149,9 @@
         let currentPage = 1;
         const pageSize = 20;
         const today = new Date();
-        let selectedStart = "1900-01-01";
-        let selectedEnd = localDateKey(today);
-        let historyInitialized = false;
-
-        function syncHistoryRange(force = false) {
-            if (loginOnly) return;
-            const datedEvents = events
-                .map((event) => localDateKey(event.timestamp))
-                .filter(Boolean)
-                .sort();
-            if (!datedEvents.length) {
-                if (force) selectedStart = "1900-01-01";
-                return;
-            }
-            const earliest = datedEvents[0];
-            const latest = datedEvents[datedEvents.length - 1];
-            if (force || !historyInitialized) {
-                selectedStart = earliest;
-                selectedEnd = latest > localDateKey(today) ? latest : localDateKey(today);
-                historyInitialized = true;
-            } else {
-                if (earliest < selectedStart) selectedStart = earliest;
-                if (latest > selectedEnd) selectedEnd = latest;
-            }
-        }
+        const todayKey = localDateKey(today);
+        let selectedStart = todayKey;
+        let selectedEnd = todayKey;
 
         const isChange = (event) => String(event.action).startsWith("Registro ");
         const isAccess = (event) => String(event.module).toLowerCase() === "acceso" || event.outcome === "denied";
@@ -235,8 +213,18 @@
             elements.chart.replaceChildren();
             elements.chart.classList.add("audit-timeline");
 
-            const start = new Date(`${selectedStart}T12:00:00`);
-            const end = new Date(`${selectedEnd}T12:00:00`);
+            const chartDates = filtered
+                .map((event) => localDateKey(event.timestamp))
+                .filter(Boolean)
+                .sort();
+            if (!chartDates.length) {
+                elements.chartEmpty.hidden = false;
+                elements.chartTotal.textContent = "0 actividades";
+                return;
+            }
+
+            const start = new Date(`${chartDates[0]}T12:00:00`);
+            const end = new Date(`${chartDates[chartDates.length - 1]}T12:00:00`);
             if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
                 elements.chartEmpty.hidden = false;
                 elements.chartTotal.textContent = "0 actividades";
@@ -252,8 +240,7 @@
             }
 
             const selectedModule = elements.module?.value || "all";
-            const searchActive = Boolean(elements.search?.value.trim());
-            const moduleNames = searchActive || selectedModule === "all"
+            const moduleNames = selectedModule === "all"
                 ? [...new Set(filtered.map((event) => event.module || "Sistema"))].sort((a, b) => a.localeCompare(b, "es"))
                 : [selectedModule];
 
@@ -441,7 +428,13 @@
                 ? (filtered.length === 1 ? "inicio de sesión" : "inicios de sesión")
                 : (filtered.length === 1 ? "actividad" : "actividades");
             elements.results.textContent = `${filtered.length} ${countLabel}`;
-            if (!loginOnly) renderChart(filtered);
+            if (!loginOnly) {
+                const selectedModule = elements.module?.value || "all";
+                const chartEvents = selectedModule === "all"
+                    ? events
+                    : events.filter((event) => (event.module || "Sistema") === selectedModule);
+                renderChart(chartEvents);
+            }
             renderRows(filtered);
         }
 
@@ -483,12 +476,10 @@
             elements.status.textContent = "Actualizando bitácora central...";
             try {
                 events = (await window.MarquezaAudit.loadAll()).map(normalizeEvent);
-                syncHistoryRange(true);
                 elements.status.textContent = "Bitácora central actualizada.";
             } catch (error) {
                 console.error("No se pudo actualizar la bitácora central.", error);
                 events = window.MarquezaAudit.read().map(normalizeEvent);
-                syncHistoryRange(true);
                 elements.status.textContent = `No se pudo consultar la bitácora central: ${error.message}. Se muestran los registros locales.`;
             }
             render();
@@ -512,7 +503,8 @@
             render();
         });
         root.querySelector("[data-audit-clear]")?.addEventListener("click", () => {
-            syncHistoryRange(true);
+            selectedStart = todayKey;
+            selectedEnd = todayKey;
             elements.module.value = "all";
             elements.search.value = "";
             if (elements.filter) elements.filter.value = "all";
@@ -540,17 +532,14 @@
         });
         window.addEventListener("marqueza:audit", (event) => {
             if (event.detail) events = [normalizeEvent(event.detail), ...events.filter((item) => item.id !== event.detail.id)];
-            syncHistoryRange();
             render();
         });
         window.addEventListener("storage", (event) => {
             if (event.key === "marqueza_bitacora") {
                 events = window.MarquezaAudit.read().map(normalizeEvent);
-                syncHistoryRange();
                 render();
             }
         });
-        syncHistoryRange(true);
         render();
         void refresh();
     }
