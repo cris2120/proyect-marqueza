@@ -504,6 +504,27 @@ body.module-actividad .cont_ayuda {
     font-size: 12px;
 }
 
+body.dark [data-audit-view] .audit-search,
+body.dark[data-audit-view] .audit-search {
+    border: 1px solid #46546b !important;
+    background: #182231 !important;
+    color: #edf5f8 !important;
+}
+
+body.dark [data-audit-view] .audit-search input,
+body.dark[data-audit-view] .audit-search input {
+    border: 0 !important;
+    background: transparent !important;
+    color: #edf5f8 !important;
+    color-scheme: dark;
+}
+
+body.dark [data-audit-view] .audit-search input::placeholder,
+body.dark[data-audit-view] .audit-search input::placeholder {
+    color: #9fb0bd !important;
+    opacity: 1;
+}
+
 [data-audit-view] .audit-filter-label {
     color: var(--audit-muted);
     font-size: 12px;

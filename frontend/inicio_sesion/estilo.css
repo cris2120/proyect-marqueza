@@ -464,6 +464,27 @@ body.dark.pagina-login .input-shell input::placeholder { color: #9fb0bd; opacity
 body.dark.pagina-login .input-shell > i { color: #9fb0bd; }
 body.dark.pagina-login .input-shell .password-toggle { color: #b9c9d4; }
 body.dark.pagina-login .options, body.dark.pagina-login .texto, body.dark.pagina-login .subtitulo { color: #b9c2ce; }
+body.dark.pagina-login .formulario .input-shell {
+    border: 1px solid #46546b !important;
+    background: #182231 !important;
+}
+body.dark.pagina-login .formulario .input-shell:focus-within {
+    border-color: #6d8799 !important;
+    background: #1f303d !important;
+}
+body.dark.pagina-login .formulario .input-shell input {
+    border: 0 !important;
+    background: transparent !important;
+    color: #edf5f8 !important;
+    color-scheme: dark;
+}
+body.dark.pagina-login .formulario .input-shell input:-webkit-autofill,
+body.dark.pagina-login .formulario .input-shell input:-webkit-autofill:hover,
+body.dark.pagina-login .formulario .input-shell input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #edf5f8 !important;
+    -webkit-box-shadow: 0 0 0 1000px #182231 inset !important;
+    caret-color: #edf5f8;
+}
 
 @media (max-width: 768px) {
     body.pagina-login { align-items: flex-start; padding: 0; }

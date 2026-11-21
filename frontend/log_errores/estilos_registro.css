@@ -1236,6 +1236,22 @@ body.dark .audit-search input,
 body.dark .audit-toolbar select,
 body.dark .audit-icon-button,
 body.dark .audit-export { border-color: #46546b; background: #182231; color: var(--help-ink); }
+body.dark.module-actividad [data-audit-view] .audit-search,
+body.dark.module-ayuda [data-audit-view] .audit-search {
+    border: 1px solid #46546b !important;
+    background: #182231 !important;
+}
+body.dark.module-actividad [data-audit-view] .audit-search input,
+body.dark.module-ayuda [data-audit-view] .audit-search input {
+    border: 0 !important;
+    background: transparent !important;
+    color: #edf5f8 !important;
+}
+body.dark.module-actividad [data-audit-view] .audit-search input::placeholder,
+body.dark.module-ayuda [data-audit-view] .audit-search input::placeholder {
+    color: #9fb0bd !important;
+    opacity: 1;
+}
 body.dark .audit-table thead { background: #176b86; }
 body.dark .audit-table th,
 body.dark .audit-table td { border-color: var(--help-border); }
