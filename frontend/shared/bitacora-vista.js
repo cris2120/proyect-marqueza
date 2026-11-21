@@ -149,9 +149,31 @@
         let currentPage = 1;
         const pageSize = 20;
         const today = new Date();
-        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-        let selectedStart = localDateKey(firstDay);
+        let selectedStart = "1900-01-01";
         let selectedEnd = localDateKey(today);
+        let historyInitialized = false;
+
+        function syncHistoryRange(force = false) {
+            if (loginOnly) return;
+            const datedEvents = events
+                .map((event) => localDateKey(event.timestamp))
+                .filter(Boolean)
+                .sort();
+            if (!datedEvents.length) {
+                if (force) selectedStart = "1900-01-01";
+                return;
+            }
+            const earliest = datedEvents[0];
+            const latest = datedEvents[datedEvents.length - 1];
+            if (force || !historyInitialized) {
+                selectedStart = earliest;
+                selectedEnd = latest > localDateKey(today) ? latest : localDateKey(today);
+                historyInitialized = true;
+            } else {
+                if (earliest < selectedStart) selectedStart = earliest;
+                if (latest > selectedEnd) selectedEnd = latest;
+            }
+        }
 
         const isChange = (event) => String(event.action).startsWith("Registro ");
         const isAccess = (event) => String(event.module).toLowerCase() === "acceso" || event.outcome === "denied";
@@ -461,10 +483,12 @@
             elements.status.textContent = "Actualizando bitácora central...";
             try {
                 events = (await window.MarquezaAudit.loadAll()).map(normalizeEvent);
+                syncHistoryRange(true);
                 elements.status.textContent = "Bitácora central actualizada.";
             } catch (error) {
                 console.error("No se pudo actualizar la bitácora central.", error);
                 events = window.MarquezaAudit.read().map(normalizeEvent);
+                syncHistoryRange(true);
                 elements.status.textContent = `No se pudo consultar la bitácora central: ${error.message}. Se muestran los registros locales.`;
             }
             render();
@@ -488,8 +512,7 @@
             render();
         });
         root.querySelector("[data-audit-clear]")?.addEventListener("click", () => {
-            selectedStart = localDateKey(firstDay);
-            selectedEnd = localDateKey(today);
+            syncHistoryRange(true);
             elements.module.value = "all";
             elements.search.value = "";
             if (elements.filter) elements.filter.value = "all";
@@ -517,14 +540,17 @@
         });
         window.addEventListener("marqueza:audit", (event) => {
             if (event.detail) events = [normalizeEvent(event.detail), ...events.filter((item) => item.id !== event.detail.id)];
+            syncHistoryRange();
             render();
         });
         window.addEventListener("storage", (event) => {
             if (event.key === "marqueza_bitacora") {
                 events = window.MarquezaAudit.read().map(normalizeEvent);
+                syncHistoryRange();
                 render();
             }
         });
+        syncHistoryRange(true);
         render();
         void refresh();
     }
